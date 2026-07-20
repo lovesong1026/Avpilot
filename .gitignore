@@ -1,0 +1,23 @@
+refer/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Python / uv
+.venv/
+**/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+api/logs/
+api/storage/
+
+# Node / Vite
+node_modules/
+web/dist/
+
+# IDE
+.idea/
+.vscode/
