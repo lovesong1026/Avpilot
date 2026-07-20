@@ -1,6 +1,7 @@
 """Environment-backed application settings."""
 
 from functools import lru_cache
+from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,18 +25,31 @@ class Settings(BaseSettings):
     postgres_user: str = "avpilot"
     postgres_password: str = "avpilot"
     postgres_db: str = "avpilot"
+    postgres_pool_size: int = 10
+    postgres_max_overflow: int = 20
 
-    elasticsearch_url: str = "http://localhost:9200"
+    elasticsearch_url: str = "http://localhost:19200"
+    elasticsearch_request_timeout: float = 10.0
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = "avpilot-neo4j"
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
+    health_check_timeout_seconds: float = 3.0
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def database_url(self) -> str:
+        user = quote_plus(self.postgres_user)
+        password = quote_plus(self.postgres_password)
+        return (
+            f"postgresql+asyncpg://{user}:{password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
 
 
 @lru_cache

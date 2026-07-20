@@ -1,0 +1,1 @@
+Avpilot database migrations. Run `uv run alembic upgrade head` from the api directory.

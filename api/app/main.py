@@ -1,10 +1,37 @@
 """FastAPI application factory."""
 
+import asyncio
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.infrastructure.cache.redis import close_redis
+from app.infrastructure.database.postgres import close_postgres
+from app.infrastructure.graph.neo4j import close_neo4j
+from app.infrastructure.search.elasticsearch import close_elasticsearch
 from app.shared.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Release all lazily-created async clients during application shutdown."""
+    yield
+    results = await asyncio.gather(
+        close_postgres(),
+        close_redis(),
+        close_elasticsearch(),
+        close_neo4j(),
+        return_exceptions=True,
+    )
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning("Failed to close an infrastructure client", exc_info=result)
 
 
 def create_app() -> FastAPI:
@@ -12,6 +39,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title=f"{settings.app_name} API",
         version="0.1.0",
+        lifespan=lifespan,
     )
     application.add_middleware(
         CORSMiddleware,

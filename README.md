@@ -34,4 +34,15 @@ npm run dev
 ```bash
 cp .env.example .env
 docker compose up -d
+cd api
+uv run alembic upgrade head
 ```
+
+健康检查：
+
+```text
+GET http://localhost:8000/api/health/live  # 进程存活
+GET http://localhost:8000/api/health       # 四类存储就绪状态
+```
+
+Avpilot 的 Elasticsearch 使用宿主机端口 `19200`，避免与其他本地项目常用的 `9200` 冲突。
