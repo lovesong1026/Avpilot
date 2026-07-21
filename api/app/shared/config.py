@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
     health_check_timeout_seconds: float = 3.0
+    storage_path: str = "storage"
+    max_upload_size_mb: int = 25
 
     jwt_secret: str = "development-only-change-me-please"
     jwt_algorithm: str = "HS256"

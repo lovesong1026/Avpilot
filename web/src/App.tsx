@@ -9,6 +9,7 @@ import { RegisterPage } from "./features/auth/RegisterPage";
 import { useAuthStore } from "./features/auth/authStore";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { PlaceholderPage } from "./features/dashboard/PlaceholderPage";
+import { KnowledgePage } from "./features/knowledge/KnowledgePage";
 
 function App() {
   const { initialized, initialize } = useAuthStore();
@@ -32,10 +33,7 @@ function App() {
       <Route element={<RequireAuth />}>
         <Route element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
-          <Route
-            path="knowledge"
-            element={<PlaceholderPage title="知识库" description="文档上传与入库链路即将接入" />}
-          />
+          <Route path="knowledge" element={<KnowledgePage />} />
           <Route
             path="chat"
             element={<PlaceholderPage title="智能问答" description="Agent 与引用问答即将接入" />}

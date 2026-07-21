@@ -27,8 +27,8 @@ export function DashboardPage() {
         <div className="readiness-card">
           <Text type="secondary">产品能力建设进度</Text>
           <strong>RAG 基础层</strong>
-          <Progress percent={38} strokeColor="#315f4d" railColor="#dce6df" />
-          <small>认证、模型、数据库、IK 与分块已完成</small>
+          <Progress percent={55} strokeColor="#315f4d" railColor="#dce6df" />
+          <small>认证、文档解析、父子分块与混合检索已完成</small>
         </div>
       </section>
 
@@ -37,8 +37,8 @@ export function DashboardPage() {
           <Card className="feature-card">
             <span className="feature-icon"><BookOutlined /></span>
             <Title level={4}>知识库</Title>
-            <Paragraph>PDF、Word、Markdown、网页与图片统一入库。</Paragraph>
-            <Tag>下一阶段</Tag>
+            <Paragraph>PDF、Word、Markdown、TXT 与 HTML 统一入库。</Paragraph>
+            <Tag color="green">已可用</Tag>
           </Card>
         </Col>
         <Col xs={24} md={8}>
