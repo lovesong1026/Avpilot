@@ -9,12 +9,14 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.knowledge import KnowledgeBaseCreate
+from app.application.auto_tagging import assign_auto_tags
 from app.application.chunking import chunk_text
 from app.application.document_parser import (
     SUPPORTED_EXTENSIONS,
     DocumentParseError,
     parse_document,
 )
+from app.application.web_crawler import fetch_web_page
 from app.infrastructure.database.models.knowledge import Document, IngestionJob, KnowledgeBase
 from app.infrastructure.database.postgres import get_session_factory
 from app.infrastructure.database.repositories.knowledge import KnowledgeRepository
@@ -23,6 +25,7 @@ from app.infrastructure.search.chunk_store import (
     build_index_actions,
     bulk_index,
     delete_document_chunks,
+    delete_source_chunks,
 )
 from app.infrastructure.storage.local import LocalDocumentStorage
 from app.shared.config import get_settings
@@ -79,12 +82,16 @@ class KnowledgeService:
         if knowledge_base.is_default:
             raise DefaultKnowledgeBaseError("默认知识库不能删除")
         documents = await self.repository.list_documents(user_id, knowledge_base_id)
+        images = await self.repository.list_images(user_id, knowledge_base_id)
         await self.session.delete(knowledge_base)
         await self.session.commit()
         for document in documents:
             await delete_document_chunks(user_id, document.id)
             if document.file_key:
                 await self.storage.delete(document.file_key)
+        for image in images:
+            await delete_source_chunks(user_id, image.id, source_type="image")
+            await self.storage.delete(image.file_key)
 
     async def upload_document(
         self,
@@ -160,8 +167,49 @@ class KnowledgeService:
         if file_key:
             await self.storage.delete(file_key)
 
+    async def create_web_document(
+        self, *, user_id: uuid.UUID, knowledge_base_id: uuid.UUID, url: str
+    ) -> tuple[Document, IngestionJob]:
+        if await self.repository.get_knowledge_base(user_id, knowledge_base_id) is None:
+            raise KnowledgeNotFoundError
+        normalized_url = url.strip()
+        if await self.repository.find_document_by_url(
+            user_id, knowledge_base_id, normalized_url
+        ):
+            raise KnowledgeConflictError("这个网页已经在当前知识库中")
+        document = Document(
+            user_id=user_id,
+            knowledge_base_id=knowledge_base_id,
+            title=normalized_url[:512],
+            source_type="web",
+            source_url=normalized_url,
+            file_name=None,
+            mime_type="text/html",
+            file_size=0,
+            status="pending",
+            chunk_count=0,
+        )
+        self.repository.add_document(document)
+        await self.session.flush()
+        job = IngestionJob(
+            user_id=user_id,
+            target_type="document",
+            target_id=document.id,
+            status="pending",
+            stage="queued",
+            progress=0.0,
+            attempts=0,
+        )
+        self.repository.add_job(job)
+        await self.session.commit()
+        await self.session.refresh(document)
+        await self.session.refresh(job)
+        return document, job
 
-async def process_document(document_id: uuid.UUID, job_id: uuid.UUID) -> None:
+
+async def process_document(
+    document_id: uuid.UUID, job_id: uuid.UUID, *, increment_attempt: bool = True
+) -> None:
     """Process one persisted upload in a fresh session after the response is returned."""
     async with get_session_factory()() as session:
         document = await session.get(Document, document_id)
@@ -173,12 +221,18 @@ async def process_document(document_id: uuid.UUID, job_id: uuid.UUID) -> None:
             job.status = "processing"
             job.stage = "parsing"
             job.progress = 0.1
-            job.attempts += 1
+            if increment_attempt:
+                job.attempts += 1
             document.status = "processing"
             await session.commit()
 
             content = await LocalDocumentStorage().read(document.file_key)
-            parsed = parse_document(document.file_name or document.title, content)
+            parse_name = (
+                "web.txt"
+                if document.source_type == "web"
+                else document.file_name or document.title
+            )
+            parsed = parse_document(parse_name, content)
             job.stage = "chunking"
             job.progress = 0.35
             await session.commit()
@@ -197,16 +251,28 @@ async def process_document(document_id: uuid.UUID, job_id: uuid.UUID) -> None:
             job.progress = 0.82
             await session.commit()
 
+            tags = await assign_auto_tags(
+                session=session,
+                gateway=gateway,
+                user_id=document.user_id,
+                target_type="document",
+                target_id=document.id,
+                content=parsed.text,
+            )
+
             await delete_document_chunks(document.user_id, document.id)
             actions = build_index_actions(
                 user_id=document.user_id,
                 knowledge_base_id=document.knowledge_base_id,
                 document_id=document.id,
                 title=document.title,
-                file_name=document.file_name,
+                file_name=(
+                    document.source_url if document.source_type == "web" else document.file_name
+                ),
                 parsed=parsed,
                 parents=parents,
                 child_vectors=vectors,
+                tags=[tag.name for tag in tags],
             )
             await bulk_index(actions)
             document.status = "ready"
@@ -238,3 +304,48 @@ async def process_document(document_id: uuid.UUID, job_id: uuid.UUID) -> None:
         finally:
             if gateway is not None:
                 await gateway.close()
+
+
+async def process_web_document(document_id: uuid.UUID, job_id: uuid.UUID) -> None:
+    """Fetch a public page safely, persist its text snapshot, then run document ingestion."""
+    async with get_session_factory()() as session:
+        document = await session.get(Document, document_id)
+        job = await session.get(IngestionJob, job_id)
+        if document is None or job is None or not document.source_url:
+            return
+        try:
+            job.status = "processing"
+            job.stage = "fetching"
+            job.progress = 0.05
+            job.attempts += 1
+            document.status = "processing"
+            await session.commit()
+            title, text, final_url = await fetch_web_page(document.source_url)
+            content = text.encode("utf-8")
+            document.title = title
+            document.source_url = final_url
+            document.file_size = len(content)
+            document.content_hash = hashlib.sha256(content).hexdigest()
+            document.file_key = LocalDocumentStorage().build_key(
+                document.user_id, document.id, ".txt"
+            )
+            await LocalDocumentStorage().save(document.file_key, content)
+            await session.commit()
+        except Exception as exc:
+            logger.exception("Web ingestion failed: %s", document_id)
+            await session.rollback()
+            document = await session.get(Document, document_id)
+            job = await session.get(IngestionJob, job_id)
+            error_message = str(exc)[:2000] or "网页抓取失败"
+            if document is not None:
+                document.status = "failed"
+                document.error_code = type(exc).__name__
+                document.error_message = error_message
+            if job is not None:
+                job.status = "failed"
+                job.stage = "failed"
+                job.error_code = type(exc).__name__
+                job.error_message = error_message
+            await session.commit()
+            return
+    await process_document(document_id, job_id, increment_attempt=False)

@@ -13,6 +13,7 @@ from app.api.schemas.knowledge import (
     KnowledgeBaseResponse,
     SearchRequest,
     SearchResponse,
+    WebDocumentCreate,
 )
 from app.application.knowledge import (
     DefaultKnowledgeBaseError,
@@ -21,24 +22,30 @@ from app.application.knowledge import (
     KnowledgeNotFoundError,
     KnowledgeService,
     process_document,
+    process_web_document,
 )
 from app.application.knowledge_search import search_knowledge_base
 from app.infrastructure.database.models.knowledge import Document, IngestionJob, KnowledgeBase
 from app.infrastructure.database.repositories.knowledge import KnowledgeRepository
+from app.infrastructure.database.repositories.tags import TagRepository
 
 router = APIRouter(prefix="/knowledge-bases", tags=["knowledge"])
 
 
-def _knowledge_response(item: KnowledgeBase, count: int = 0) -> KnowledgeBaseResponse:
-    return KnowledgeBaseResponse.model_validate(item).model_copy(update={"document_count": count})
+def _knowledge_response(
+    item: KnowledgeBase, document_count: int = 0, image_count: int = 0
+) -> KnowledgeBaseResponse:
+    return KnowledgeBaseResponse.model_validate(item).model_copy(
+        update={"document_count": document_count, "image_count": image_count}
+    )
 
 
 def _document_response(
-    document: Document, job: IngestionJob | None = None
+    document: Document, job: IngestionJob | None = None, tags: list[object] | None = None
 ) -> DocumentResponse:
     job_response = IngestionJobResponse.model_validate(job) if job else None
     return DocumentResponse.model_validate(document).model_copy(
-        update={"ingestion_job": job_response}
+        update={"ingestion_job": job_response, "tags": tags or []}
     )
 
 
@@ -47,7 +54,10 @@ async def list_knowledge_bases(
     user: CurrentUser, session: SessionDependency
 ) -> list[KnowledgeBaseResponse]:
     rows = await KnowledgeRepository(session).list_knowledge_bases(user.id)
-    return [_knowledge_response(item, count) for item, count in rows]
+    return [
+        _knowledge_response(item, document_count, image_count)
+        for item, document_count, image_count in rows
+    ]
 
 
 @router.post("", response_model=KnowledgeBaseResponse, status_code=status.HTTP_201_CREATED)
@@ -81,8 +91,13 @@ async def list_documents(
     if await repository.get_knowledge_base(user.id, knowledge_base_id) is None:
         raise HTTPException(status_code=404, detail="知识库不存在")
     documents = await repository.list_documents(user.id, knowledge_base_id)
+    tag_repository = TagRepository(session)
     return [
-        _document_response(document, await repository.get_latest_job(user.id, document.id))
+        _document_response(
+            document,
+            await repository.get_latest_job(user.id, document.id),
+            await tag_repository.document_tags(document.id),
+        )
         for document in documents
     ]
 
@@ -112,6 +127,32 @@ async def upload_document(
     except KnowledgeConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     background_tasks.add_task(process_document, document.id, job.id)
+    return _document_response(document, job)
+
+
+@router.post(
+    "/{knowledge_base_id}/web-pages",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def add_web_page(
+    knowledge_base_id: uuid.UUID,
+    request: WebDocumentCreate,
+    background_tasks: BackgroundTasks,
+    user: CurrentUser,
+    session: SessionDependency,
+) -> DocumentResponse:
+    try:
+        document, job = await KnowledgeService(session).create_web_document(
+            user_id=user.id,
+            knowledge_base_id=knowledge_base_id,
+            url=str(request.url),
+        )
+    except KnowledgeNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="知识库不存在") from exc
+    except KnowledgeConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    background_tasks.add_task(process_web_document, document.id, job.id)
     return _document_response(document, job)
 
 

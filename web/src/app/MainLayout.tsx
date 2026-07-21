@@ -6,6 +6,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   NodeIndexOutlined,
+  PictureOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import { Avatar, Button, Layout, Menu, Space, Typography } from "antd";
@@ -19,6 +20,7 @@ const { Header, Sider, Content } = Layout;
 const menuItems = [
   { key: "/", icon: <DatabaseOutlined />, label: "工作台" },
   { key: "/knowledge", icon: <BookOutlined />, label: "知识库" },
+  { key: "/images", icon: <PictureOutlined />, label: "图片库" },
   { key: "/chat", icon: <CommentOutlined />, label: "智能问答" },
   { key: "/memory", icon: <NodeIndexOutlined />, label: "记忆图谱" },
   { key: "/search", icon: <SearchOutlined />, label: "全局搜索" },

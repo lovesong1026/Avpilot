@@ -34,6 +34,14 @@ export const knowledgeApi = {
     return response.data;
   },
 
+  async addWebPage(knowledgeBaseId: string, url: string): Promise<KnowledgeDocument> {
+    const response = await apiClient.post<KnowledgeDocument>(
+      `/knowledge-bases/${knowledgeBaseId}/web-pages`,
+      { url },
+    );
+    return response.data;
+  },
+
   async deleteDocument(documentId: string): Promise<void> {
     await apiClient.delete(`/knowledge-bases/documents/${documentId}`);
   },

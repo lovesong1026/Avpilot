@@ -1,4 +1,4 @@
-import { ArrowRightOutlined, BookOutlined, CloudUploadOutlined, NodeIndexOutlined } from "@ant-design/icons";
+import { ArrowRightOutlined, BookOutlined, CloudUploadOutlined, PictureOutlined } from "@ant-design/icons";
 import { Button, Card, Col, Progress, Row, Space, Tag, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 
@@ -27,8 +27,8 @@ export function DashboardPage() {
         <div className="readiness-card">
           <Text type="secondary">产品能力建设进度</Text>
           <strong>RAG 基础层</strong>
-          <Progress percent={68} strokeColor="#315f4d" railColor="#dce6df" />
-          <small>知识入库、混合检索、流式问答与引用溯源已完成</small>
+          <Progress percent={80} strokeColor="#315f4d" railColor="#dce6df" />
+          <small>文档、网页、图片、流式问答与引用溯源已形成闭环</small>
         </div>
       </section>
 
@@ -37,7 +37,7 @@ export function DashboardPage() {
           <Card className="feature-card">
             <span className="feature-icon"><BookOutlined /></span>
             <Title level={4}>知识库</Title>
-            <Paragraph>PDF、Word、Markdown、TXT 与 HTML 统一入库。</Paragraph>
+            <Paragraph>文档与公开网页统一进入父子分块和混合检索。</Paragraph>
             <Tag color="green">已可用</Tag>
           </Card>
         </Col>
@@ -51,10 +51,10 @@ export function DashboardPage() {
         </Col>
         <Col xs={24} md={8}>
           <Card className="feature-card">
-            <span className="feature-icon"><NodeIndexOutlined /></span>
-            <Title level={4}>长期记忆</Title>
-            <Paragraph>从对话中提取实体、事件和关系图谱。</Paragraph>
-            <Tag>规划中</Tag>
+            <span className="feature-icon"><PictureOutlined /></span>
+            <Title level={4}>多模态图片</Title>
+            <Paragraph>AI 描述、OCR、物体、场景和语义检索。</Paragraph>
+            <Tag color="green">已可用</Tag>
           </Card>
         </Col>
       </Row>

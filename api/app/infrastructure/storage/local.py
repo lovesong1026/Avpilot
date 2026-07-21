@@ -1,4 +1,4 @@
-"""Local, user-scoped document storage used by the first ingestion slice."""
+"""Local, user-scoped asset storage for documents and images."""
 
 import asyncio
 import uuid
@@ -15,6 +15,10 @@ class LocalDocumentStorage:
     def build_key(self, user_id: uuid.UUID, document_id: uuid.UUID, extension: str) -> str:
         safe_extension = extension.lower() if extension.startswith(".") else f".{extension.lower()}"
         return f"documents/{user_id}/{document_id}{safe_extension}"
+
+    def build_image_key(self, user_id: uuid.UUID, image_id: uuid.UUID, extension: str) -> str:
+        safe_extension = extension.lower() if extension.startswith(".") else f".{extension.lower()}"
+        return f"images/{user_id}/{image_id}{safe_extension}"
 
     async def save(self, key: str, content: bytes) -> None:
         path = self._resolve(key)

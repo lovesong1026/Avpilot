@@ -3,12 +3,21 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class KnowledgeBaseCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     description: str | None = Field(default=None, max_length=1024)
+
+
+class TagSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    color: str
+    source: str
 
 
 class KnowledgeBaseResponse(BaseModel):
@@ -20,6 +29,7 @@ class KnowledgeBaseResponse(BaseModel):
     is_default: bool
     chat_enabled: bool
     document_count: int = 0
+    image_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -43,6 +53,7 @@ class DocumentResponse(BaseModel):
     knowledge_base_id: uuid.UUID
     title: str
     source_type: str
+    source_url: str | None
     file_name: str | None
     mime_type: str
     file_size: int
@@ -52,6 +63,7 @@ class DocumentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     ingestion_job: IngestionJobResponse | None = None
+    tags: list[TagSummary] = Field(default_factory=list)
 
 
 class SearchRequest(BaseModel):
@@ -80,3 +92,7 @@ class SearchHitResponse(BaseModel):
 class SearchResponse(BaseModel):
     query: str
     hits: list[SearchHitResponse]
+
+
+class WebDocumentCreate(BaseModel):
+    url: HttpUrl

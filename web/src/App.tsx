@@ -11,6 +11,7 @@ import { ChatPage } from "./features/chat/ChatPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { PlaceholderPage } from "./features/dashboard/PlaceholderPage";
 import { KnowledgePage } from "./features/knowledge/KnowledgePage";
+import { ImageLibraryPage } from "./features/images/ImageLibraryPage";
 
 function App() {
   const { initialized, initialize } = useAuthStore();
@@ -35,6 +36,7 @@ function App() {
         <Route element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
+          <Route path="images" element={<ImageLibraryPage />} />
           <Route path="chat" element={<ChatPage />} />
           <Route
             path="memory"

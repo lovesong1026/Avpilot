@@ -22,6 +22,7 @@ def build_index_actions(
     parsed: ParsedDocument,
     parents: list[ParentChunk],
     child_vectors: list[list[float]],
+    tags: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     expected_children = sum(len(parent.children) for parent in parents)
     if expected_children != len(child_vectors):
@@ -49,6 +50,7 @@ def build_index_actions(
                 start_char=parent.start_char,
                 end_char=parent.end_char,
                 created_at=now,
+                tags=tags or [],
             )
         )
         for child in parent.children:
@@ -69,6 +71,7 @@ def build_index_actions(
                     start_char=child.start_char,
                     end_char=child.end_char,
                     created_at=now,
+                    tags=tags or [],
                 )
             )
             vector_index += 1
@@ -91,6 +94,7 @@ def _action(
     start_char: int,
     end_char: int,
     created_at: str,
+    tags: list[str],
 ) -> dict[str, Any]:
     source: dict[str, Any] = {
         "user_id": str(user_id),
@@ -102,7 +106,7 @@ def _action(
         "chunk_type": chunk_type,
         "parent_id": parent_id,
         "content": content,
-        "tags": [],
+        "tags": tags,
         "locator": {
             "file_name": file_name,
             "page": page,
@@ -126,6 +130,45 @@ async def bulk_index(actions: list[dict[str, Any]]) -> int:
 
 
 async def delete_document_chunks(user_id: uuid.UUID, document_id: uuid.UUID) -> int:
+    return await delete_source_chunks(user_id, document_id, source_type="document")
+
+
+def build_image_action(
+    *,
+    user_id: uuid.UUID,
+    knowledge_base_id: uuid.UUID,
+    image_id: uuid.UUID,
+    file_name: str,
+    content: str,
+    vector: list[float],
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
+    chunk_id = f"image-{image_id}"
+    return {
+        "_op_type": "index",
+        "_index": CHUNK_INDEX,
+        "_id": chunk_id,
+        "_source": {
+            "user_id": str(user_id),
+            "knowledge_base_id": str(knowledge_base_id),
+            "source_type": "image",
+            "source_id": str(image_id),
+            "source_title": file_name,
+            "chunk_id": chunk_id,
+            "chunk_type": "image",
+            "parent_id": None,
+            "content": content,
+            "vector": vector,
+            "tags": tags or [],
+            "locator": {"file_name": file_name},
+            "created_at": datetime.now(UTC).isoformat(),
+        },
+    }
+
+
+async def delete_source_chunks(
+    user_id: uuid.UUID, source_id: uuid.UUID, *, source_type: str
+) -> int:
     if not await get_elasticsearch().indices.exists(index=CHUNK_INDEX):
         return 0
     response = await get_elasticsearch().delete_by_query(
@@ -134,7 +177,8 @@ async def delete_document_chunks(user_id: uuid.UUID, document_id: uuid.UUID) -> 
             "bool": {
                 "filter": [
                     {"term": {"user_id": str(user_id)}},
-                    {"term": {"source_id": str(document_id)}},
+                    {"term": {"source_type": source_type}},
+                    {"term": {"source_id": str(source_id)}},
                 ]
             }
         },

@@ -58,6 +58,8 @@ async def search_knowledge_bases(
             query=query,
             query_vector=query_vector,
             recall_size=max(20, top_k * 4),
+            source_type="document",
+            chunk_type="child",
         )
         if use_rerank and candidates:
             candidates = await _rerank(gateway, query, candidates, top_k)
@@ -73,13 +75,15 @@ async def _retrieve_candidates(
     query: str,
     query_vector: list[float],
     recall_size: int,
+    source_type: str,
+    chunk_type: str,
 ) -> list[dict[str, Any]]:
     client = get_elasticsearch()
     filters = [
         {"term": {"user_id": str(user_id)}},
         {"terms": {"knowledge_base_id": [str(item) for item in knowledge_base_ids]}},
-        {"term": {"source_type": "document"}},
-        {"term": {"chunk_type": "child"}},
+        {"term": {"source_type": source_type}},
+        {"term": {"chunk_type": chunk_type}},
     ]
     vector_response = await client.search(
         index=CHUNK_INDEX,
@@ -190,3 +194,42 @@ async def _resolve_results(
             }
         )
     return results
+
+
+async def search_image_assets(
+    *,
+    user_id: uuid.UUID,
+    knowledge_base_ids: list[uuid.UUID],
+    query: str,
+    top_k: int,
+) -> list[dict[str, Any]]:
+    """Search multimodal image descriptions with BM25/vector RRF."""
+    if not knowledge_base_ids:
+        return []
+    gateway = BailianGateway()
+    try:
+        query_vector = (await gateway.embed([query]))[0]
+        candidates = await _retrieve_candidates(
+            user_id=user_id,
+            knowledge_base_ids=knowledge_base_ids,
+            query=query,
+            query_vector=query_vector,
+            recall_size=max(20, top_k * 4),
+            source_type="image",
+            chunk_type="image",
+        )
+        return [_image_result(item) for item in candidates[:top_k]]
+    finally:
+        await gateway.close()
+
+
+def _image_result(item: dict[str, Any]) -> dict[str, Any]:
+    source = item["source"]
+    locator = source.get("locator") or {}
+    return {
+        "chunk_id": item["chunk_id"],
+        "image_id": source["source_id"],
+        "file_name": locator.get("file_name") or source["source_title"],
+        "content": source["content"],
+        "score": round(float(item["score"]), 4),
+    }

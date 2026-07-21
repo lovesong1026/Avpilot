@@ -5,6 +5,7 @@ export type KnowledgeBase = {
   is_default: boolean;
   chat_enabled: boolean;
   document_count: number;
+  image_count: number;
   created_at: string;
   updated_at: string;
 };
@@ -19,11 +20,19 @@ export type IngestionJob = {
   updated_at: string;
 };
 
+export type TagSummary = {
+  id: string;
+  name: string;
+  color: string;
+  source: string;
+};
+
 export type KnowledgeDocument = {
   id: string;
   knowledge_base_id: string;
   title: string;
   source_type: string;
+  source_url: string | null;
   file_name: string | null;
   mime_type: string;
   file_size: number;
@@ -33,6 +42,7 @@ export type KnowledgeDocument = {
   created_at: string;
   updated_at: string;
   ingestion_job: IngestionJob | null;
+  tags: TagSummary[];
 };
 
 export type SearchHit = {

@@ -14,6 +14,7 @@ dependencies = [
     "markdown>=3.7,<4",
     "neo4j>=6,<7",
     "openai>=2,<3",
+    "pillow>=11,<13",
     "pwdlib[argon2]>=0.3,<1",
     "pydantic-settings>=2.7,<3",
     "pyjwt>=2.10,<3",

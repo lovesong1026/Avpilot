@@ -3,6 +3,7 @@ import {
   DatabaseOutlined,
   DeleteOutlined,
   FileTextOutlined,
+  LinkOutlined,
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
@@ -39,6 +40,7 @@ const statusMeta: Record<KnowledgeDocument["status"], { label: string; color: st
 
 const stageLabels: Record<string, string> = {
   queued: "等待处理",
+  fetching: "抓取网页",
   parsing: "解析文本",
   chunking: "父子分块",
   embedding: "生成向量",
@@ -62,6 +64,7 @@ export function KnowledgePage() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [addingWebPage, setAddingWebPage] = useState(false);
   const [searching, setSearching] = useState(false);
   const [useRerank, setUseRerank] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -134,6 +137,20 @@ export function KnowledgePage() {
     return Upload.LIST_IGNORE;
   };
 
+  const addWebPage = async (url: string) => {
+    if (!selectedId || !url.trim()) return;
+    setAddingWebPage(true);
+    try {
+      await knowledgeApi.addWebPage(selectedId, url.trim());
+      await Promise.all([loadDocuments(selectedId), loadBases()]);
+      message.success("网页已加入抓取队列");
+    } catch (error) {
+      message.error(apiErrorMessage(error, "网页入库失败"));
+    } finally {
+      setAddingWebPage(false);
+    }
+  };
+
   const removeDocument = (document: KnowledgeDocument) => {
     modal.confirm({
       title: `删除“${document.title}”？`,
@@ -187,7 +204,7 @@ export function KnowledgePage() {
               <span className="base-icon"><DatabaseOutlined /></span>
               <span>
                 <strong>{item.name}</strong>
-                <small>{item.document_count} 份文档{item.is_default ? " · 默认" : ""}</small>
+                <small>{item.document_count} 份文档 · {item.image_count} 张图片{item.is_default ? " · 默认" : ""}</small>
               </span>
             </button>
           ))}
@@ -203,7 +220,7 @@ export function KnowledgePage() {
                   <Title level={2}>{selectedBase.name}</Title>
                   <Paragraph>{selectedBase.description || "收纳资料，并建立带来源坐标的知识索引。"}</Paragraph>
                 </div>
-                <div className="base-stat"><strong>{selectedBase.document_count}</strong><span>份资料在轨</span></div>
+                <div className="base-stat"><strong>{selectedBase.document_count + selectedBase.image_count}</strong><span>份资料在轨</span></div>
               </section>
 
               <Dragger
@@ -218,6 +235,17 @@ export function KnowledgePage() {
                 <p className="ant-upload-hint">支持 PDF、Word、Markdown、TXT、HTML，单个文件最大 25 MB</p>
               </Dragger>
 
+              <section className="web-ingestion-bar">
+                <span className="web-ingestion-icon"><LinkOutlined /></span>
+                <div><Text strong>网页入库</Text><Text type="secondary">抓取公开网页正文，并进入同一套父子分块和混合检索。</Text></div>
+                <Input.Search
+                  enterButton="抓取入库"
+                  placeholder="https://example.com/article"
+                  loading={addingWebPage}
+                  onSearch={(value) => void addWebPage(value)}
+                />
+              </section>
+
               <section className="document-section">
                 <div className="section-heading"><Title level={3}>文档状态</Title><Text type="secondary">解析 → 分块 → 向量化 → 建立索引</Text></div>
                 <div className="document-list" aria-busy={loading}>
@@ -229,10 +257,11 @@ export function KnowledgePage() {
                     const progress = Math.round((document.ingestion_job?.progress ?? 0) * 100);
                     return (
                       <article className="document-row" key={document.id}>
-                        <span className="document-icon"><FileTextOutlined /></span>
+                        <span className="document-icon">{document.source_type === "web" ? <LinkOutlined /> : <FileTextOutlined />}</span>
                         <div className="document-copy">
                           <Space wrap><Text strong>{document.title}</Text><Tag color={meta.color}>{meta.label}</Tag></Space>
-                          <Space wrap size="large" className="document-meta"><span>{formatSize(document.file_size)}</span><span>{document.chunk_count} 个检索片段</span><span>{new Date(document.created_at).toLocaleString("zh-CN")}</span></Space>
+                          {document.tags.length > 0 && <Space wrap size={4} className="content-tags">{document.tags.map((tag) => <Tag key={tag.id} color={tag.color}>{tag.name}</Tag>)}</Space>}
+                          <Space wrap size="large" className="document-meta"><span>{document.source_type === "web" ? "网页" : formatSize(document.file_size)}</span><span>{document.chunk_count} 个检索片段</span><span>{new Date(document.created_at).toLocaleString("zh-CN")}</span></Space>
                           {document.ingestion_job && ["pending", "processing"].includes(document.status) && (
                             <div className="document-progress"><Progress percent={progress} size="small" /><small>{stageLabels[document.ingestion_job.stage] || document.ingestion_job.stage}</small></div>
                           )}

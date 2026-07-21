@@ -88,7 +88,7 @@ class ConversationService:
         unique = list(dict.fromkeys(requested))
         if not unique:
             rows = await self.knowledge.list_knowledge_bases(user_id)
-            return [item.id for item, _ in rows if item.chat_enabled]
+            return [item.id for item, _, _ in rows if item.chat_enabled]
         for knowledge_base_id in unique:
             if await self.knowledge.get_knowledge_base(user_id, knowledge_base_id) is None:
                 raise InvalidKnowledgeSelectionError("所选知识库不存在或无权访问")
