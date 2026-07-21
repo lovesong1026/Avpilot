@@ -17,6 +17,8 @@ api/storage/
 # Node / Vite
 node_modules/
 web/dist/
+.playwright-cli/
+output/playwright/
 
 # IDE
 .idea/

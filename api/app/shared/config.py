@@ -38,6 +38,21 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
     health_check_timeout_seconds: float = 3.0
 
+    jwt_secret: str = "development-only-change-me-please"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 30
+
+    dashscope_api_key: str = ""
+    bailian_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    bailian_chat_model: str = "qwen-plus"
+    bailian_vision_model: str = "qwen-vl-plus"
+    bailian_embedding_model: str = "text-embedding-v4"
+    bailian_embedding_dimensions: int = 1024
+    bailian_rerank_model: str = "qwen3-rerank"
+    bailian_workspace_id: str = ""
+    bailian_rerank_base_url: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

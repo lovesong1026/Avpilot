@@ -12,6 +12,7 @@ from app.api.router import api_router
 from app.infrastructure.cache.redis import close_redis
 from app.infrastructure.database.postgres import close_postgres
 from app.infrastructure.graph.neo4j import close_neo4j
+from app.infrastructure.search.chunk_index import ensure_chunk_index
 from app.infrastructure.search.elasticsearch import close_elasticsearch
 from app.shared.config import get_settings
 
@@ -21,6 +22,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Release all lazily-created async clients during application shutdown."""
+    try:
+        await ensure_chunk_index()
+    except Exception:
+        logger.warning("Elasticsearch index initialization failed", exc_info=True)
     yield
     results = await asyncio.gather(
         close_postgres(),
