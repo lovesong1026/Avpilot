@@ -1,5 +1,5 @@
 import { Spin } from "antd";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { RequireAuth } from "./app/RequireAuth";
@@ -7,12 +7,17 @@ import { MainLayout } from "./app/MainLayout";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { useAuthStore } from "./features/auth/authStore";
-import { ChatPage } from "./features/chat/ChatPage";
-import { DashboardPage } from "./features/dashboard/DashboardPage";
-import { PlaceholderPage } from "./features/dashboard/PlaceholderPage";
-import { KnowledgePage } from "./features/knowledge/KnowledgePage";
-import { ImageLibraryPage } from "./features/images/ImageLibraryPage";
-import { MemoryPage } from "./features/memory/MemoryPage";
+
+const ChatPage = lazy(() => import("./features/chat/ChatPage").then((module) => ({ default: module.ChatPage })));
+const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage").then((module) => ({ default: module.DashboardPage })));
+const ImageLibraryPage = lazy(() => import("./features/images/ImageLibraryPage").then((module) => ({ default: module.ImageLibraryPage })));
+const KnowledgePage = lazy(() => import("./features/knowledge/KnowledgePage").then((module) => ({ default: module.KnowledgePage })));
+const MemoryPage = lazy(() => import("./features/memory/MemoryPage").then((module) => ({ default: module.MemoryPage })));
+const SearchPage = lazy(() => import("./features/search/SearchPage").then((module) => ({ default: module.SearchPage })));
+
+function page(content: ReactNode) {
+  return <Suspense fallback={<div className="route-loader"><Spin size="large" /></div>}>{content}</Suspense>;
+}
 
 function App() {
   const { initialized, initialize } = useAuthStore();
@@ -35,15 +40,12 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<MainLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="knowledge" element={<KnowledgePage />} />
-          <Route path="images" element={<ImageLibraryPage />} />
-          <Route path="chat" element={<ChatPage />} />
-          <Route path="memory" element={<MemoryPage />} />
-          <Route
-            path="search"
-            element={<PlaceholderPage title="全局搜索" description="文档、图片与记忆搜索即将接入" />}
-          />
+          <Route index element={page(<DashboardPage />)} />
+          <Route path="knowledge" element={page(<KnowledgePage />)} />
+          <Route path="images" element={page(<ImageLibraryPage />)} />
+          <Route path="chat" element={page(<ChatPage />)} />
+          <Route path="memory" element={page(<MemoryPage />)} />
+          <Route path="search" element={page(<SearchPage />)} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

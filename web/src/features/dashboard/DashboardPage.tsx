@@ -5,16 +5,29 @@ import {
   NodeIndexOutlined,
   PictureOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Col, Progress, Row, Space, Tag, Typography } from "antd";
+import { App, Button, Card, Col, Progress, Row, Skeleton, Space, Tag, Typography } from "antd";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuthStore } from "../auth/authStore";
+import type { DashboardData } from "../../entities/navigation";
+import { apiErrorMessage } from "../../shared/apiClient";
+import { navigationApi } from "../search/navigationApi";
+import { DashboardCharts } from "./DashboardCharts";
 
 const { Title, Paragraph, Text } = Typography;
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const { message } = App.useApp();
+  const [data, setData] = useState<DashboardData>();
+
+  useEffect(() => {
+    void navigationApi.dashboard()
+      .then(setData)
+      .catch((error) => message.error(apiErrorMessage(error, "统计仪表盘加载失败")));
+  }, [message]);
 
   return (
     <div className="dashboard-page">
@@ -72,6 +85,20 @@ export function DashboardPage() {
           </Card>
         </Col>
       </Row>
+
+      {data ? <>
+        <section className="dashboard-metrics">
+          {[
+            ["documents", "文档"],
+            ["images", "图片"],
+            ["memories", "记忆来源"],
+            ["entities", "记忆实体"],
+            ["favorites", "收藏"],
+            ["tags", "标签"],
+          ].map(([key, label]) => <article key={key}><strong>{data.counts[key] || 0}</strong><span>{label}</span></article>)}
+        </section>
+        <DashboardCharts data={data} />
+      </> : <Skeleton active className="dashboard-skeleton" />}
     </div>
   );
 }

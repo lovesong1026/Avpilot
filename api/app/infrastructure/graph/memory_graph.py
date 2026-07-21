@@ -159,6 +159,20 @@ class MemoryGraphRepository:
         """
         return await self._rows(query, user_id=user_id, limit=limit)
 
+    async def searchable_statements(self, user_id: str) -> list[dict[str, Any]]:
+        query = """
+        MATCH (src:MemorySource {user_id: $user_id})-[:HAS_FRAGMENT]->
+              (:MemoryFragment)-[:SUPPORTS]->(s:Statement)
+        WITH s, head(collect(DISTINCT src)) AS src
+        MATCH (s)-[:SUBJECT]->(subject:Entity)
+        MATCH (s)-[:OBJECT]->(object:Entity)
+        RETURN DISTINCT s.id AS id, s.text AS text, s.embedding AS embedding,
+               s.statement_type AS statement_type, s.event_time AS event_time,
+               coalesce(s.predicate, '关联') AS predicate,
+               subject.name AS subject, object.name AS object, src.id AS source_id
+        """
+        return await self._rows(query, user_id=user_id)
+
     async def rebuild_communities(self, user_id: str) -> list[dict[str, Any]]:
         query = """
         MATCH (e:Entity {user_id: $user_id})

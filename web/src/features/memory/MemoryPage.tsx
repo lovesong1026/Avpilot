@@ -2,7 +2,6 @@ import {
   ApartmentOutlined,
   ClockCircleOutlined,
   DeleteOutlined,
-  NodeIndexOutlined,
   RadarChartOutlined,
   SaveOutlined,
   TeamOutlined,
@@ -17,6 +16,7 @@ import type {
   TimelineItem,
 } from "../../entities/memory";
 import { apiErrorMessage } from "../../shared/apiClient";
+import { MemoryGraphCanvas } from "./MemoryGraphCanvas";
 import { memoryApi } from "./memoryApi";
 
 const { Title, Paragraph, Text } = Typography;
@@ -178,15 +178,10 @@ export function MemoryPage() {
             <Text type="secondary">四层溯源：来源 → 片段 → 陈述 → 实体</Text>
           </div>
 
-          {view === "图谱" && <div className="memory-node-grid">
-            {recentNodes.length === 0 && <Empty description="记住一条内容后，这里会形成星图" />}
-            {recentNodes.map((node) => <article className={`memory-node ${kindMeta[node.kind].className}`} key={node.id}>
-              <div><NodeIndexOutlined /><Tag>{kindMeta[node.kind].label}</Tag></div>
-              <Text ellipsis={{ tooltip: node.label }}>{node.label}</Text>
-              {node.properties.entity_type && <small>{String(node.properties.entity_type)}</small>}
-              {node.properties.statement_type && <small>{node.properties.statement_type === "event" ? "事件记忆" : "画像记忆"}</small>}
-            </article>)}
-          </div>}
+          {view === "图谱" && <>
+            {recentNodes.length === 0 ? <Empty description="记住一条内容后，这里会形成星图" /> : <MemoryGraphCanvas data={graph} />}
+            {recentNodes.length > 0 && <div className="memory-graph-legend">{Object.entries(kindMeta).map(([key, item]) => <span className={item.className} key={key}><i />{item.label}</span>)}</div>}
+          </>}
 
           {view === "时间线" && <div className="memory-timeline">
             {timeline.length === 0 && <Empty description="带明确时间的事件会进入时间线" />}
@@ -210,4 +205,3 @@ export function MemoryPage() {
     </div>
   );
 }
-

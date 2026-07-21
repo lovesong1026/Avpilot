@@ -6,6 +6,7 @@ from app.application.memory import (
     _split_fragments,
     _statement_key,
 )
+from app.application.navigation import _rank_memories
 
 
 def test_normalize_unifies_user_self_mentions():
@@ -102,3 +103,30 @@ def test_statement_dedupe_requires_same_event_date():
         )
         is None
     )
+
+
+def test_global_memory_search_applies_absolute_semantic_gate():
+    rows = [
+        {
+            "id": "relevant",
+            "text": "用户喜欢航空航天",
+            "embedding": [1.0, 0.0],
+            "statement_type": "profile",
+            "source_id": "source",
+            "subject": "用户本人",
+            "predicate": "喜欢",
+            "object": "航空航天",
+        },
+        {
+            "id": "irrelevant",
+            "text": "用户喜欢烹饪",
+            "embedding": [0.0, 1.0],
+            "statement_type": "profile",
+            "source_id": "source",
+            "subject": "用户本人",
+            "predicate": "喜欢",
+            "object": "烹饪",
+        },
+    ]
+    hits = _rank_memories(rows, [1.0, 0.0], top_k=8, min_score=0.25)
+    assert [item["target_id"] for item in hits] == ["relevant"]

@@ -1,6 +1,6 @@
 [project]
 name = "avpilot-api"
-version = "0.1.0"
+version = "0.6.0"
 description = "Avpilot AI knowledge and memory assistant API"
 requires-python = ">=3.12,<3.13"
 dependencies = [
