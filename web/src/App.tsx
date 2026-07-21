@@ -12,6 +12,7 @@ import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { PlaceholderPage } from "./features/dashboard/PlaceholderPage";
 import { KnowledgePage } from "./features/knowledge/KnowledgePage";
 import { ImageLibraryPage } from "./features/images/ImageLibraryPage";
+import { MemoryPage } from "./features/memory/MemoryPage";
 
 function App() {
   const { initialized, initialize } = useAuthStore();
@@ -38,10 +39,7 @@ function App() {
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="images" element={<ImageLibraryPage />} />
           <Route path="chat" element={<ChatPage />} />
-          <Route
-            path="memory"
-            element={<PlaceholderPage title="记忆图谱" description="Neo4j 记忆提取与图谱即将接入" />}
-          />
+          <Route path="memory" element={<MemoryPage />} />
           <Route
             path="search"
             element={<PlaceholderPage title="全局搜索" description="文档、图片与记忆搜索即将接入" />}

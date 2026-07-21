@@ -1,4 +1,10 @@
-import { ArrowRightOutlined, BookOutlined, CloudUploadOutlined, PictureOutlined } from "@ant-design/icons";
+import {
+  ArrowRightOutlined,
+  BookOutlined,
+  CloudUploadOutlined,
+  NodeIndexOutlined,
+  PictureOutlined,
+} from "@ant-design/icons";
 import { Button, Card, Col, Progress, Row, Space, Tag, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 
@@ -26,14 +32,14 @@ export function DashboardPage() {
         </div>
         <div className="readiness-card">
           <Text type="secondary">产品能力建设进度</Text>
-          <strong>RAG 基础层</strong>
-          <Progress percent={80} strokeColor="#315f4d" railColor="#dce6df" />
-          <small>文档、网页、图片、流式问答与引用溯源已形成闭环</small>
+          <strong>知识与记忆闭环</strong>
+          <Progress percent={88} strokeColor="#315f4d" railColor="#dce6df" />
+          <small>多模态知识、可追溯问答与长期记忆已形成闭环</small>
         </div>
       </section>
 
       <Row gutter={[18, 18]}>
-        <Col xs={24} md={8}>
+        <Col xs={24} md={12} lg={6}>
           <Card className="feature-card">
             <span className="feature-icon"><BookOutlined /></span>
             <Title level={4}>知识库</Title>
@@ -41,7 +47,7 @@ export function DashboardPage() {
             <Tag color="green">已可用</Tag>
           </Card>
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} md={12} lg={6}>
           <Card className="feature-card">
             <span className="feature-icon"><ArrowRightOutlined /></span>
             <Title level={4}>可追溯问答</Title>
@@ -49,11 +55,19 @@ export function DashboardPage() {
             <Tag color="green">已可用</Tag>
           </Card>
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} md={12} lg={6}>
           <Card className="feature-card">
             <span className="feature-icon"><PictureOutlined /></span>
             <Title level={4}>多模态图片</Title>
             <Paragraph>AI 描述、OCR、物体、场景和语义检索。</Paragraph>
+            <Tag color="green">已可用</Tag>
+          </Card>
+        </Col>
+        <Col xs={24} md={12} lg={6}>
+          <Card className="feature-card">
+            <span className="feature-icon"><NodeIndexOutlined /></span>
+            <Title level={4}>长期记忆</Title>
+            <Paragraph>画像、事件、四层溯源、去重与社区聚类。</Paragraph>
             <Tag color="green">已可用</Tag>
           </Card>
         </Col>

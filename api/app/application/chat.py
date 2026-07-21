@@ -1,5 +1,6 @@
 """Conversation lifecycle and citation-grounded SSE chat orchestration."""
 
+import asyncio
 import json
 import logging
 import uuid
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas.chat import ChatStreamRequest, ConversationCreate, ConversationUpdate
 from app.application.knowledge_search import search_knowledge_bases
+from app.application.memory import extract_conversation_memory
 from app.infrastructure.database.models.conversation import Citation, Conversation, Message
 from app.infrastructure.database.postgres import get_session_factory
 from app.infrastructure.database.repositories.conversation import (
@@ -21,6 +23,15 @@ from app.infrastructure.database.repositories.knowledge import KnowledgeReposito
 from app.infrastructure.llm.bailian import BailianGateway
 
 logger = logging.getLogger(__name__)
+_memory_tasks: set[asyncio.Task[None]] = set()
+
+
+def _dispatch_conversation_memory(
+    user_id: uuid.UUID, text: str, source_message_id: uuid.UUID
+) -> None:
+    task = asyncio.create_task(extract_conversation_memory(user_id, text, source_message_id))
+    _memory_tasks.add(task)
+    task.add_done_callback(_memory_tasks.discard)
 
 
 class ConversationNotFoundError(Exception):
@@ -202,6 +213,7 @@ async def stream_chat_turn(
                 assistant_message = await _persist_assistant(
                     session, conversation.id, answer, hits, None
                 )
+                _dispatch_conversation_memory(user_id, request.message.strip(), user_message.id)
                 yield format_sse(
                     "completed",
                     {
@@ -235,6 +247,7 @@ async def stream_chat_turn(
             assistant_message = await _persist_assistant(
                 session, conversation.id, answer, hits, usage
             )
+            _dispatch_conversation_memory(user_id, request.message.strip(), user_message.id)
             yield format_sse(
                 "completed",
                 {

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.infrastructure.cache.redis import close_redis
 from app.infrastructure.database.postgres import close_postgres
+from app.infrastructure.graph.memory_graph import ensure_memory_graph_schema
 from app.infrastructure.graph.neo4j import close_neo4j
 from app.infrastructure.search.chunk_index import ensure_chunk_index
 from app.infrastructure.search.elasticsearch import close_elasticsearch
@@ -26,6 +27,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await ensure_chunk_index()
     except Exception:
         logger.warning("Elasticsearch index initialization failed", exc_info=True)
+    try:
+        await ensure_memory_graph_schema()
+    except Exception:
+        logger.warning("Neo4j memory schema initialization failed", exc_info=True)
     yield
     results = await asyncio.gather(
         close_postgres(),
