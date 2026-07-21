@@ -1,6 +1,11 @@
 """ORM model registry imported by Alembic."""
 
-from app.infrastructure.database.models.conversation import Citation, Conversation, Message
+from app.infrastructure.database.models.conversation import (
+    Citation,
+    Conversation,
+    Message,
+    conversation_knowledge_bases,
+)
 from app.infrastructure.database.models.identity import RefreshToken, User
 from app.infrastructure.database.models.knowledge import (
     Document,
@@ -29,6 +34,7 @@ __all__ = [
     "RefreshToken",
     "Tag",
     "User",
+    "conversation_knowledge_bases",
     "document_tags",
     "image_tags",
 ]

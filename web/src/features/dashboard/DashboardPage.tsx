@@ -27,8 +27,8 @@ export function DashboardPage() {
         <div className="readiness-card">
           <Text type="secondary">产品能力建设进度</Text>
           <strong>RAG 基础层</strong>
-          <Progress percent={55} strokeColor="#315f4d" railColor="#dce6df" />
-          <small>认证、文档解析、父子分块与混合检索已完成</small>
+          <Progress percent={68} strokeColor="#315f4d" railColor="#dce6df" />
+          <small>知识入库、混合检索、流式问答与引用溯源已完成</small>
         </div>
       </section>
 
@@ -45,8 +45,8 @@ export function DashboardPage() {
           <Card className="feature-card">
             <span className="feature-icon"><ArrowRightOutlined /></span>
             <Title level={4}>可追溯问答</Title>
-            <Paragraph>混合检索、工具编排与原文引用。</Paragraph>
-            <Tag>规划中</Tag>
+            <Paragraph>混合检索、流式生成与原文引用。</Paragraph>
+            <Tag color="green">已可用</Tag>
           </Card>
         </Col>
         <Col xs={24} md={8}>

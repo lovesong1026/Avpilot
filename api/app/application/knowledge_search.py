@@ -30,12 +30,31 @@ async def search_knowledge_base(
     top_k: int,
     use_rerank: bool,
 ) -> list[dict[str, Any]]:
+    return await search_knowledge_bases(
+        user_id=user_id,
+        knowledge_base_ids=[knowledge_base_id],
+        query=query,
+        top_k=top_k,
+        use_rerank=use_rerank,
+    )
+
+
+async def search_knowledge_bases(
+    *,
+    user_id: uuid.UUID,
+    knowledge_base_ids: list[uuid.UUID],
+    query: str,
+    top_k: int,
+    use_rerank: bool,
+) -> list[dict[str, Any]]:
+    if not knowledge_base_ids:
+        return []
     gateway = BailianGateway()
     try:
         query_vector = (await gateway.embed([query]))[0]
         candidates = await _retrieve_candidates(
             user_id=user_id,
-            knowledge_base_id=knowledge_base_id,
+            knowledge_base_ids=knowledge_base_ids,
             query=query,
             query_vector=query_vector,
             recall_size=max(20, top_k * 4),
@@ -50,7 +69,7 @@ async def search_knowledge_base(
 async def _retrieve_candidates(
     *,
     user_id: uuid.UUID,
-    knowledge_base_id: uuid.UUID,
+    knowledge_base_ids: list[uuid.UUID],
     query: str,
     query_vector: list[float],
     recall_size: int,
@@ -58,7 +77,7 @@ async def _retrieve_candidates(
     client = get_elasticsearch()
     filters = [
         {"term": {"user_id": str(user_id)}},
-        {"term": {"knowledge_base_id": str(knowledge_base_id)}},
+        {"terms": {"knowledge_base_id": [str(item) for item in knowledge_base_ids]}},
         {"term": {"source_type": "document"}},
         {"term": {"chunk_type": "child"}},
     ]

@@ -7,6 +7,7 @@ import { MainLayout } from "./app/MainLayout";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { useAuthStore } from "./features/auth/authStore";
+import { ChatPage } from "./features/chat/ChatPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { PlaceholderPage } from "./features/dashboard/PlaceholderPage";
 import { KnowledgePage } from "./features/knowledge/KnowledgePage";
@@ -34,10 +35,7 @@ function App() {
         <Route element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
-          <Route
-            path="chat"
-            element={<PlaceholderPage title="智能问答" description="Agent 与引用问答即将接入" />}
-          />
+          <Route path="chat" element={<ChatPage />} />
           <Route
             path="memory"
             element={<PlaceholderPage title="记忆图谱" description="Neo4j 记忆提取与图谱即将接入" />}

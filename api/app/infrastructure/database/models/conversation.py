@@ -2,12 +2,29 @@
 
 import uuid
 
-from sqlalchemy import Float, ForeignKey, String, Text
+from sqlalchemy import Column, Float, ForeignKey, String, Table, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.database.base import Base
 from app.infrastructure.database.models.common import TimestampMixin, UUIDPrimaryKeyMixin
+
+conversation_knowledge_bases = Table(
+    "conversation_knowledge_bases",
+    Base.metadata,
+    Column(
+        "conversation_id",
+        UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "knowledge_base_id",
+        UUID(as_uuid=True),
+        ForeignKey("knowledge_bases.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class Conversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
