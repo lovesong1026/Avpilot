@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.api.schemas.observability import ObservabilitySummary
+
 
 class GlobalSearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
@@ -79,4 +81,4 @@ class DashboardResponse(BaseModel):
     tag_distribution: list[dict[str, object]]
     memory_trend: list[dict[str, object]]
     community_distribution: list[dict[str, object]]
-
+    observability: ObservabilitySummary

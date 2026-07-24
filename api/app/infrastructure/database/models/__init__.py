@@ -18,6 +18,12 @@ from app.infrastructure.database.models.knowledge import (
     image_tags,
 )
 from app.infrastructure.database.models.memory import MemorySource
+from app.infrastructure.database.models.observability import (
+    AgentSpan,
+    AgentTrace,
+    ModelUsage,
+    RetrievalSnapshot,
+)
 from app.infrastructure.database.models.review import DailyReview
 from app.infrastructure.database.models.task import TaskOutbox
 
@@ -30,9 +36,13 @@ __all__ = [
     "ImageAsset",
     "IngestionJob",
     "KnowledgeBase",
+    "AgentSpan",
+    "AgentTrace",
     "MemorySource",
     "Message",
+    "ModelUsage",
     "RefreshToken",
+    "RetrievalSnapshot",
     "Tag",
     "TaskOutbox",
     "User",

@@ -62,4 +62,4 @@ class AgentRun:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     direct_answer: str | None = None
     mode: str = "native"
-
+    model_usages: list[dict[str, Any]] = field(default_factory=list)

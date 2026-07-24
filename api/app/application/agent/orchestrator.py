@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
@@ -104,11 +105,26 @@ class AgentOrchestrator:
                 f"用户问题：{question}\n"
                 f"已执行记录：{json.dumps(scratchpad, ensure_ascii=False)}"
             )
+            started = time.monotonic()
             response = await self.gateway.chat(
                 [*history[-6:], {"role": "user", "content": prompt}],
                 model=model,
                 temperature=0.0,
             )
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                payload = usage.model_dump()
+                run.model_usages.append(
+                    {
+                        "operation": "agent_planning",
+                        "model": model,
+                        "status": "completed",
+                        "input_tokens": int(payload.get("prompt_tokens") or 0),
+                        "output_tokens": int(payload.get("completion_tokens") or 0),
+                        "total_tokens": int(payload.get("total_tokens") or 0),
+                        "duration_ms": round((time.monotonic() - started) * 1000),
+                    }
+                )
             action = _parse_react_action(response.choices[0].message.content or "")
             if action.get("action") != "tool":
                 run.direct_answer = str(action.get("answer") or "") or None

@@ -5,6 +5,8 @@ import type {
   GlobalSearchHit,
   ManagedTag,
   SearchResponse,
+  AgentTrace,
+  AgentTraceDetail,
 } from "../../entities/navigation";
 import { apiClient } from "../../shared/apiClient";
 
@@ -64,5 +66,20 @@ export const navigationApi = {
   async dashboard(): Promise<DashboardData> {
     return (await apiClient.get<DashboardData>("/dashboard")).data;
   },
-};
 
+  async traces(limit = 12): Promise<AgentTrace[]> {
+    return (
+      await apiClient.get<AgentTrace[]>("/observability/traces", {
+        params: { limit },
+      })
+    ).data;
+  },
+
+  async trace(traceId: string): Promise<AgentTraceDetail> {
+    return (
+      await apiClient.get<AgentTraceDetail>(
+        `/observability/traces/${traceId}`,
+      )
+    ).data;
+  },
+};

@@ -13,13 +13,15 @@
 - [v0.6 搜索导航与可视化](docs/v0.6-search-and-visualization.md)
 - [v0.7 智能 Agent Workflow](docs/v0.7-agent-workflow.md)
 - [v0.8 可靠任务系统](docs/v0.8-reliable-tasks.md)
+- [v0.9 质量评测与可观测性](docs/v0.9-quality-observability.md)
 
 ## 当前阶段
 
-项目已完成 v0.8 可靠任务系统：文档、网页、图片和记忆处理已从 FastAPI
-进程迁移到 Redis/Celery 多队列；PostgreSQL Transactional Outbox 保证任务意图
-与业务记录一起提交，并由 Beat 自动补投、恢复中断任务。任务支持晚确认、Worker
-异常重新投递、指数退避、幂等认领、超时、失败状态和用户手动重试。
+项目已完成 v0.9 质量评测与可观测性：每次智能问答都会形成用户隔离的 Agent
+Trace，记录编排模式、阶段 Span、工具调用、检索快照、引用、模型、输入/输出 Token、
+耗时和失败状态。仪表盘可以查看 Token 趋势、Agent 成功率、工具分布及最近 Trace；
+`eval/` 提供确定性的 RAG 离线评测，GitHub Actions 自动执行后端、前端、迁移、
+PostgreSQL/Redis/Celery 集成与 Compose 检查。本项目不估算或保存模型费用。
 
 ## 版本演进路线
 
@@ -35,6 +37,7 @@
 | v0.6 搜索与可视化 | ✅ 已完成 | 实现文档、图片、记忆三类全局搜索，补充收藏、标签管理、每日回顾、AntV X6 知识图谱和 ECharts 统计仪表盘。 |
 | v0.7 智能 Agent | ✅ 已完成 | 使用 LangChain 自主编排知识库、长期记忆和可选联网搜索；支持 Function Calling/ReAct 双模式、SSE 工具轨迹、统一引用、Token 刷新和图片多模态问答。 |
 | v0.8 可靠任务系统 | ✅ 已完成 | 使用 Redis/Celery 的 ingestion、memory、maintenance 队列迁移耗时任务；加入事务型 Outbox、晚确认、指数退避、任务认领、Beat 补投与卡死恢复，并支持前端手动重试。 |
+| v0.9 质量与可观测性 | ✅ 已完成 | 建立 Agent Trace、Span、检索快照和 Token 统计；仪表盘展示耗时、成功率与工具分布；加入 RAG 离线评测、真实 PostgreSQL/Celery 集成测试和 GitHub Actions。 |
 
 ### 已完成的改进记录
 
@@ -135,6 +138,22 @@
   Neo4j 延续业务键 `MERGE`，实现至少一次投递下的幂等收敛。
 - Beat 每 30 秒补投 Outbox，每分钟检查中断任务，每天重建记忆社区。
 - 文档、图片和记忆页面在失败后提供手动重试入口。
+
+#### 11. 质量评测与可观测性
+
+- 每轮智能问答从用户消息开始创建稳定 `trace_id`，并随 SSE `meta` 和 `completed`
+  事件返回。
+- PostgreSQL 分别保存 Trace、Agent/工具/回答 Span、模型 Token 用量和检索快照；
+  所有查询按用户隔离。
+- 模型统计只包含供应商、模型、阶段、输入 Token、输出 Token、总 Token、耗时和
+  状态，不建立价格表，也不计算费用。
+- 检索快照保存工具、查询、命中数、耗时、最高分和引用证据，便于复盘回答来源。
+- 仪表盘增加 14 天 Token 趋势、工具调用分布、Agent 成功率、平均耗时和 Trace
+  详情抽屉。
+- `eval/` 提供版本化 JSONL 数据集与 Recall@K、MRR、引用命中率、引用编号合法性
+  等确定性评测。
+- GitHub Actions 自动运行 Ruff、单元测试、前端构建、Alembic 漂移检查、
+  PostgreSQL 集成测试、Celery/Redis 往返和 Compose 配置检查。
 
 ### 后续实施原则
 

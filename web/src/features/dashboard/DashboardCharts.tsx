@@ -1,4 +1,4 @@
-import { LineChart, PieChart } from "echarts/charts";
+import { BarChart, LineChart, PieChart } from "echarts/charts";
 import {
   GridComponent,
   LegendComponent,
@@ -11,7 +11,7 @@ import { useEffect, useRef } from "react";
 
 import type { DashboardData } from "../../entities/navigation";
 
-use([LineChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
+use([BarChart, LineChart, PieChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
 
 function Chart({ option, label }: { option: EChartsCoreOption; label: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -67,10 +67,56 @@ export function DashboardCharts({ data }: { data: DashboardData }) {
       data: distribution,
     }],
   };
+  const tokenTrend: EChartsCoreOption = {
+    tooltip: { trigger: "axis" },
+    legend: { bottom: 0, data: ["输入 Token", "输出 Token"] },
+    grid: { left: 52, right: 18, top: 24, bottom: 48 },
+    xAxis: {
+      type: "category",
+      data: data.observability.token_trend.map((item) => item.date.slice(5)),
+      axisLabel: { color: "#77857d", fontSize: 10 },
+    },
+    yAxis: { type: "value", minInterval: 1, splitLine: { lineStyle: { color: "#edf1ed" } } },
+    series: [
+      {
+        name: "输入 Token",
+        type: "line",
+        smooth: true,
+        data: data.observability.token_trend.map((item) => item.input_tokens),
+        lineStyle: { color: "#315f4d", width: 3 },
+        itemStyle: { color: "#315f4d" },
+      },
+      {
+        name: "输出 Token",
+        type: "line",
+        smooth: true,
+        data: data.observability.token_trend.map((item) => item.output_tokens),
+        lineStyle: { color: "#b47b55", width: 3 },
+        itemStyle: { color: "#b47b55" },
+      },
+    ],
+  };
+  const tools: EChartsCoreOption = {
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+    grid: { left: 108, right: 24, top: 20, bottom: 24 },
+    xAxis: { type: "value", minInterval: 1 },
+    yAxis: {
+      type: "category",
+      data: data.observability.tool_distribution.map((item) => item.name),
+      axisLabel: { color: "#66756d", width: 96, overflow: "truncate" },
+    },
+    series: [{
+      type: "bar",
+      data: data.observability.tool_distribution.map((item) => item.value),
+      itemStyle: { color: "#52796f", borderRadius: [0, 6, 6, 0] },
+    }],
+  };
   return (
     <section className="dashboard-charts">
       <article><h3>近 14 天记忆轨迹</h3><Chart option={line} label="近14天记忆新增趋势折线图" /></article>
       <article><h3>{data.tag_distribution.length ? "知识标签分布" : "记忆社区分布"}</h3><Chart option={pie} label="内容分类分布环形图" /></article>
+      <article><h3>近 14 天 Token</h3><Chart option={tokenTrend} label="近14天输入与输出Token趋势图" /></article>
+      <article><h3>Agent 工具调用</h3><Chart option={tools} label="Agent工具调用次数条形图" /></article>
     </section>
   );
 }

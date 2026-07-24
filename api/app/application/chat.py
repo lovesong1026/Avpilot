@@ -5,6 +5,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator, Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from openai.types.chat import ChatCompletionMessageParam
@@ -17,6 +18,11 @@ from app.application.agent.schemas import AgentToolContext, ToolCitation, ToolRe
 from app.application.agent.tools import build_agent_tools
 from app.application.image_processing import prepare_image_for_vision
 from app.application.memory import extract_conversation_memory
+from app.application.observability import (
+    complete_agent_trace,
+    create_agent_trace,
+    fail_agent_trace,
+)
 from app.infrastructure.database.models.conversation import Citation, Conversation, Message
 from app.infrastructure.database.postgres import get_session_factory
 from app.infrastructure.database.repositories.conversation import (
@@ -145,6 +151,7 @@ async def stream_chat_turn(
     user_id: uuid.UUID, request: ChatStreamRequest
 ) -> AsyncIterator[str]:
     gateway: BailianGateway | None = None
+    trace_id: uuid.UUID | None = None
     try:
         async with get_session_factory()() as session:
             service = ConversationService(session)
@@ -189,6 +196,16 @@ async def stream_chat_turn(
             await service.conversations.touch(conversation.id)
             await session.commit()
             await session.refresh(user_message)
+            trace_started = datetime.now(UTC)
+            trace = await create_agent_trace(
+                session,
+                user_id=user_id,
+                conversation_id=conversation.id,
+                user_message_id=user_message.id,
+                question=request.message.strip(),
+                started_at=trace_started,
+            )
+            trace_id = trace.id
             knowledge_base_ids = await service.conversations.knowledge_base_ids(conversation.id)
 
             yield format_sse(
@@ -197,6 +214,7 @@ async def stream_chat_turn(
                     "conversation_id": str(conversation.id),
                     "title": conversation.title,
                     "user_message_id": str(user_message.id),
+                    "trace_id": str(trace.id),
                 },
             )
             yield format_sse("retrieval_started", {"query": request.message.strip()})
@@ -217,10 +235,39 @@ async def stream_chat_turn(
             )
             orchestrator = AgentOrchestrator(registry, gateway, settings=settings)
             event_queue: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue()
+            tool_starts: dict[str, dict[str, Any]] = {}
+            tool_spans: list[dict[str, Any]] = []
 
             async def emit_agent_event(event: str, payload: dict[str, Any]) -> None:
+                now = datetime.now(UTC)
+                call_id = str(payload.get("tool_call_id") or "")
+                if event == "tool_started" and call_id:
+                    tool_starts[call_id] = {
+                        "name": str(payload.get("name") or "unknown"),
+                        "arguments": payload.get("arguments") or {},
+                        "started_at": now,
+                    }
+                elif event == "tool_completed" and call_id:
+                    started = tool_starts.pop(
+                        call_id,
+                        {
+                            "name": str(payload.get("name") or "unknown"),
+                            "arguments": {},
+                            "started_at": now,
+                        },
+                    )
+                    tool_spans.append(
+                        {
+                            **started,
+                            "status": str(payload.get("status") or "completed"),
+                            "hit_count": int(payload.get("hit_count") or 0),
+                            "error": payload.get("error"),
+                            "finished_at": now,
+                        }
+                    )
                 await event_queue.put((event, payload))
 
+            agent_started = datetime.now(UTC)
             agent_task = asyncio.create_task(
                 orchestrator.run(
                     question=request.message.strip(),
@@ -236,6 +283,7 @@ async def stream_chat_turn(
                     continue
                 yield format_sse(event, payload)
             run = await agent_task
+            agent_finished = datetime.now(UTC)
 
             citations = _unique_citations(run.results)
             yield format_sse("retrieval_completed", {"hit_count": len(citations)})
@@ -258,9 +306,14 @@ async def stream_chat_turn(
             )
             answer_parts: list[str] = []
             usage: dict[str, object] | None = None
-            model = settings.bailian_vision_model if image_urls else None
+            answer_model = (
+                settings.bailian_vision_model
+                if image_urls
+                else settings.bailian_chat_model
+            )
+            answer_started = datetime.now(UTC)
             async for chunk in gateway.stream_chat(
-                model_messages, model=model, temperature=0.1
+                model_messages, model=answer_model, temperature=0.1
             ):
                 if chunk.usage is not None:
                     usage = chunk.usage.model_dump()
@@ -282,6 +335,22 @@ async def stream_chat_turn(
                 usage,
                 run.tool_calls,
             )
+            finished_at = datetime.now(UTC)
+            await complete_agent_trace(
+                session,
+                trace=trace,
+                assistant_message_id=assistant_message.id,
+                run=run,
+                citations=citations,
+                final_usage=usage,
+                answer_model=answer_model,
+                trace_started=trace_started,
+                agent_started=agent_started,
+                agent_finished=agent_finished,
+                answer_started=answer_started,
+                finished_at=finished_at,
+                tool_spans=tool_spans,
+            )
             await extract_conversation_memory(user_id, request.message.strip(), user_message.id)
             yield format_sse(
                 "agent_completed",
@@ -296,10 +365,16 @@ async def stream_chat_turn(
                 {
                     "conversation_id": str(conversation.id),
                     "message_id": str(assistant_message.id),
+                    "trace_id": str(trace.id),
                 },
             )
     except Exception as exc:
         logger.exception("Streaming chat turn failed")
+        if trace_id is not None:
+            try:
+                await fail_agent_trace(trace_id, exc)
+            except Exception:
+                logger.exception("Could not mark Agent trace as failed: %s", trace_id)
         yield format_sse("error", {"message": str(exc) or "问答生成失败"})
     finally:
         if gateway is not None:

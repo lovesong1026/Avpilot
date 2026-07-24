@@ -14,6 +14,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.observability import observability_summary
 from app.infrastructure.database.models.conversation import Conversation, Message
 from app.infrastructure.database.models.knowledge import (
     Document,
@@ -464,4 +465,5 @@ async def dashboard_data(session: AsyncSession, user_id: uuid.UUID) -> dict[str,
             {"name": item["name"], "value": item["member_count"]}
             for item in communities[:10]
         ],
+        "observability": await observability_summary(session, user_id, 14),
     }

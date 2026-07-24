@@ -53,6 +53,10 @@ celery_app.conf.update(
             "task": "app.tasks.maintenance.recover_stale_ingestions",
             "schedule": 60.0,
         },
+        "recover-stale-agent-traces": {
+            "task": "app.tasks.maintenance.recover_stale_agent_traces",
+            "schedule": 60.0,
+        },
         "rebuild-memory-communities": {
             "task": "app.tasks.maintenance.rebuild_memory_communities",
             "schedule": crontab(hour=3, minute=0),

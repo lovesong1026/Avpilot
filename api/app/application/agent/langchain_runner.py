@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
@@ -61,6 +62,8 @@ class LangChainAgentRunner:
         context = f"\n\n用户附带图片的已有分析：\n{image_context}" if image_context else ""
         messages: list[Any] = [*history[-6:], {"role": "user", "content": question + context}]
         last_answer: str | None = None
+        seen_usage_messages: set[str] = set()
+        started = time.monotonic()
         async for update in graph.astream(
             {"messages": messages},
             config={"recursion_limit": max(4, self.settings.agent_max_steps * 2 + 2)},
@@ -74,7 +77,18 @@ class LangChainAgentRunner:
                         content = message.content
                         if isinstance(content, str) and content.strip():
                             last_answer = content.strip()
+                    if isinstance(message, AIMessage):
+                        message_key = str(message.id or id(message))
+                        if message_key not in seen_usage_messages:
+                            usage = _message_usage(message)
+                            if usage is not None:
+                                run.model_usages.append(usage)
+                            seen_usage_messages.add(message_key)
         run.direct_answer = last_answer
+        if run.model_usages:
+            run.model_usages[-1]["duration_ms"] = round(
+                (time.monotonic() - started) * 1000
+            )
         return run
 
     def _adapt_tool(
@@ -116,3 +130,30 @@ class LangChainAgentRunner:
             description=description,
             args_schema=SearchToolInput,
         )
+
+
+def _message_usage(message: AIMessage) -> dict[str, Any] | None:
+    usage = message.usage_metadata or {}
+    metadata = message.response_metadata or {}
+    token_usage = metadata.get("token_usage")
+    if not usage and isinstance(token_usage, dict):
+        usage = {
+            "input_tokens": token_usage.get("prompt_tokens", 0),
+            "output_tokens": token_usage.get("completion_tokens", 0),
+            "total_tokens": token_usage.get("total_tokens", 0),
+        }
+    if not usage:
+        return None
+    input_tokens = int(usage.get("input_tokens") or 0)
+    output_tokens = int(usage.get("output_tokens") or 0)
+    return {
+        "operation": "agent_planning",
+        "model": str(metadata.get("model_name") or metadata.get("model") or ""),
+        "status": "completed",
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": int(
+            usage.get("total_tokens") or input_tokens + output_tokens
+        ),
+        "duration_ms": None,
+    }

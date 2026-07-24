@@ -1,5 +1,6 @@
 """Periodic recovery and maintenance jobs."""
 
+from app.application.observability import recover_stale_agent_traces
 from app.application.task_queue import (
     dispatch_due_outbox,
     rebuild_all_memory_communities,
@@ -17,6 +18,11 @@ def recover_task_outbox() -> int:
 @celery_app.task(name="app.tasks.maintenance.recover_stale_ingestions")
 def recover_stale_ingestions() -> int:
     return run_async(recover_stale_work)
+
+
+@celery_app.task(name="app.tasks.maintenance.recover_stale_agent_traces")
+def recover_agent_traces() -> int:
+    return run_async(recover_stale_agent_traces)
 
 
 @celery_app.task(
