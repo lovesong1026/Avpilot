@@ -21,6 +21,44 @@ apiClient.interceptors.request.use((config) => {
 
 let refreshRequest: Promise<TokenPair> | null = null;
 
+export async function refreshTokens(): Promise<TokenPair> {
+  const refreshToken = tokenStorage.getRefreshToken();
+  if (!refreshToken) throw new Error("登录状态已失效");
+  refreshRequest ??= axios
+    .post<TokenPair>("/api/auth/refresh", { refresh_token: refreshToken })
+    .then((response) => response.data)
+    .finally(() => {
+      refreshRequest = null;
+    });
+  const tokens = await refreshRequest;
+  tokenStorage.save(tokens);
+  return tokens;
+}
+
+export async function authorizedFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const request = (accessToken: string | null) =>
+    fetch(input, {
+      ...init,
+      headers: {
+        ...Object.fromEntries(new Headers(init.headers).entries()),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+  let response = await request(tokenStorage.getAccessToken());
+  if (response.status !== 401) return response;
+  try {
+    const tokens = await refreshTokens();
+    response = await request(tokens.access_token);
+    return response;
+  } catch (error) {
+    tokenStorage.clear();
+    throw error;
+  }
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -35,15 +73,8 @@ apiClient.interceptors.response.use(
       throw error;
     }
     request._retry = true;
-    refreshRequest ??= axios
-      .post<TokenPair>("/api/auth/refresh", { refresh_token: refreshToken })
-      .then((response) => response.data)
-      .finally(() => {
-        refreshRequest = null;
-      });
     try {
-      const tokens = await refreshRequest;
-      tokenStorage.save(tokens);
+      const tokens = await refreshTokens();
       request.headers.Authorization = `Bearer ${tokens.access_token}`;
       return await apiClient(request);
     } catch (refreshError) {

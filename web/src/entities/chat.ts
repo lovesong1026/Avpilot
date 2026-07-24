@@ -20,9 +20,29 @@ export type ChatCitation = {
     page?: number | null;
     start_char?: number | null;
     end_char?: number | null;
+    url?: string | null;
   } | null;
   quote: string;
   score: number | null;
+  url?: string | null;
+};
+
+export type ChatAttachment = {
+  type: "image";
+  image_id: string;
+  file_name: string;
+  content_url: string;
+};
+
+export type ToolCallRecord = {
+  tool_call_id?: string;
+  name: string;
+  arguments?: Record<string, unknown>;
+  status: "running" | "completed" | "failed";
+  duration_ms?: number;
+  hit_count?: number;
+  error?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 export type ChatMessage = {
@@ -30,10 +50,12 @@ export type ChatMessage = {
   conversation_id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  attachments: ChatAttachment[] | null;
+  tool_calls: ToolCallRecord[] | null;
   usage: Record<string, unknown> | null;
   citations: ChatCitation[];
   created_at: string;
   streaming?: boolean;
 };
 
-export type ChatPhase = "idle" | "retrieving" | "generating" | "error";
+export type ChatPhase = "idle" | "planning" | "retrieving" | "generating" | "error";

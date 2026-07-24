@@ -1,13 +1,22 @@
-import type { ChatCitation, ChatMessage, Conversation } from "../../entities/chat";
-import { apiClient } from "../../shared/apiClient";
-import { tokenStorage } from "../../shared/tokenStorage";
+import type {
+  ChatCitation,
+  ChatMessage,
+  Conversation,
+  ToolCallRecord,
+} from "../../entities/chat";
+import { apiClient, authorizedFetch } from "../../shared/apiClient";
 
 type StreamHandlers = {
   onMeta?: (payload: { conversation_id: string; title: string; user_message_id: string }) => void;
+  onAgentStarted?: (payload: { mode: string }) => void;
+  onAgentFallback?: (payload: { from: string; to: string; reason: string }) => void;
+  onToolStarted?: (payload: ToolCallRecord) => void;
+  onToolCompleted?: (payload: ToolCallRecord) => void;
   onRetrievalStarted?: () => void;
   onRetrievalCompleted?: (payload: { hit_count: number }) => void;
   onCitation?: (citations: ChatCitation[]) => void;
   onToken?: (text: string) => void;
+  onAgentCompleted?: (payload: { mode: string; tool_call_count: number; citation_count: number }) => void;
   onCompleted?: (payload: { conversation_id: string; message_id: string }) => void;
   onError?: (message: string) => void;
 };
@@ -44,16 +53,20 @@ export const chatApi = {
   },
 
   async streamMessage(
-    input: { conversation_id?: string; message: string; knowledge_base_ids: string[] },
+    input: {
+      conversation_id?: string;
+      message: string;
+      knowledge_base_ids: string[];
+      image_ids: string[];
+      allow_web: boolean;
+    },
     handlers: StreamHandlers,
     signal?: AbortSignal,
   ): Promise<void> {
-    const token = tokenStorage.getAccessToken();
-    const response = await fetch("/api/chat/stream", {
+    const response = await authorizedFetch("/api/chat/stream", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(input),
       signal,
@@ -95,10 +108,18 @@ function dispatchBlock(block: string, handlers: StreamHandlers) {
   const payload = JSON.parse(data.join("\n")) as Record<string, unknown>;
   switch (event) {
     case "meta": handlers.onMeta?.(payload as never); break;
+    case "agent_started": handlers.onAgentStarted?.(payload as never); break;
+    case "agent_fallback": handlers.onAgentFallback?.(payload as never); break;
+    case "tool_started": handlers.onToolStarted?.({
+      ...(payload as unknown as ToolCallRecord),
+      status: "running",
+    }); break;
+    case "tool_completed": handlers.onToolCompleted?.(payload as never); break;
     case "retrieval_started": handlers.onRetrievalStarted?.(); break;
     case "retrieval_completed": handlers.onRetrievalCompleted?.(payload as never); break;
     case "citation": handlers.onCitation?.((payload.citations as ChatCitation[]) || []); break;
     case "token": handlers.onToken?.(String(payload.text || "")); break;
+    case "agent_completed": handlers.onAgentCompleted?.(payload as never); break;
     case "completed": handlers.onCompleted?.(payload as never); break;
     case "error": handlers.onError?.(String(payload.message || "问答失败")); break;
   }

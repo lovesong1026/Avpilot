@@ -2,6 +2,9 @@ import {
   BookOutlined,
   CommentOutlined,
   DeleteOutlined,
+  GlobalOutlined,
+  LoadingOutlined,
+  PaperClipOutlined,
   PlusOutlined,
   RocketOutlined,
   SendOutlined,
@@ -16,21 +19,32 @@ import {
   Select,
   Space,
   Spin,
+  Switch,
   Tag,
   Typography,
 } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ChatCitation, ChatMessage, ChatPhase, Conversation } from "../../entities/chat";
+import type {
+  ChatCitation,
+  ChatMessage,
+  ChatPhase,
+  Conversation,
+  ToolCallRecord,
+} from "../../entities/chat";
+import type { ImageAsset } from "../../entities/images";
 import type { KnowledgeBase } from "../../entities/knowledge";
 import { apiErrorMessage } from "../../shared/apiClient";
 import { knowledgeApi } from "../knowledge/knowledgeApi";
+import { AuthenticatedImage } from "../images/AuthenticatedImage";
+import { imageApi } from "../images/imageApi";
 import { chatApi } from "./chatApi";
 
 const { Title, Text, Paragraph } = Typography;
 
 const phaseCopy: Record<ChatPhase, string> = {
   idle: "",
+  planning: "正在判断需要调用哪些工具…",
   retrieving: "正在沿知识轨道检索资料…",
   generating: "已找到资料，正在组织带引用的回答…",
   error: "本轮回答未完成",
@@ -40,8 +54,11 @@ export function ChatPage() {
   const { message, modal } = App.useApp();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [images, setImages] = useState<ImageAsset[]>([]);
   const [activeId, setActiveId] = useState<string>();
   const [selectedBaseIds, setSelectedBaseIds] = useState<string[]>([]);
+  const [selectedImageIds, setSelectedImageIds] = useState<string[]>([]);
+  const [allowWeb, setAllowWeb] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -70,10 +87,11 @@ export function ChatPage() {
   }, []);
 
   useEffect(() => {
-    void Promise.all([chatApi.listConversations(), knowledgeApi.listBases()])
-      .then(([conversationItems, baseItems]) => {
+    void Promise.all([chatApi.listConversations(), knowledgeApi.listBases(), imageApi.list()])
+      .then(([conversationItems, baseItems, imageItems]) => {
         setConversations(conversationItems);
         setKnowledgeBases(baseItems);
+        setImages(imageItems.filter((item) => item.status === "ready"));
         const first = conversationItems[0];
         if (first) void openConversation(first);
         else setSelectedBaseIds(baseItems.filter((item) => item.chat_enabled).map((item) => item.id));
@@ -92,6 +110,7 @@ export function ChatPage() {
     setActiveId(undefined);
     setMessages([]);
     setSelectedBaseIds(defaultBaseIds);
+    setSelectedImageIds([]);
     setInput("");
     setPhase("idle");
   };
@@ -118,6 +137,20 @@ export function ChatPage() {
     setMessages((items) => items.map((item) => (item.id === id ? updater(item) : item)));
   };
 
+  const upsertToolCall = (assistantId: string, call: ToolCallRecord) => {
+    updateAssistant(assistantId, (item) => {
+      const current = item.tool_calls || [];
+      const key = call.tool_call_id || call.name;
+      const exists = current.some((row) => (row.tool_call_id || row.name) === key);
+      return {
+        ...item,
+        tool_calls: exists
+          ? current.map((row) => ((row.tool_call_id || row.name) === key ? { ...row, ...call } : row))
+          : [...current, call],
+      };
+    });
+  };
+
   const sendMessage = async () => {
     const question = input.trim();
     if (!question || sending) return;
@@ -130,8 +163,37 @@ export function ChatPage() {
     const now = new Date().toISOString();
     setMessages((items) => [
       ...items,
-      { id: `user-${Date.now()}`, conversation_id: temporaryConversationId, role: "user", content: question, usage: null, citations: [], created_at: now },
-      { id: assistantId, conversation_id: temporaryConversationId, role: "assistant", content: "", usage: null, citations: [], created_at: now, streaming: true },
+      {
+        id: `user-${Date.now()}`,
+        conversation_id: temporaryConversationId,
+        role: "user",
+        content: question,
+        attachments: selectedImageIds.map((imageId) => {
+          const image = images.find((item) => item.id === imageId);
+          return {
+            type: "image" as const,
+            image_id: imageId,
+            file_name: image?.file_name || "图片",
+            content_url: `/api/images/${imageId}/content`,
+          };
+        }),
+        tool_calls: null,
+        usage: null,
+        citations: [],
+        created_at: now,
+      },
+      {
+        id: assistantId,
+        conversation_id: temporaryConversationId,
+        role: "assistant",
+        content: "",
+        attachments: null,
+        tool_calls: [],
+        usage: null,
+        citations: [],
+        created_at: now,
+        streaming: true,
+      },
     ]);
     setInput("");
     setSending(true);
@@ -142,12 +204,25 @@ export function ChatPage() {
     let streamConversationId = activeId;
     try {
       await chatApi.streamMessage(
-        { conversation_id: activeId, message: question, knowledge_base_ids: selectedBaseIds },
+        {
+          conversation_id: activeId,
+          message: question,
+          knowledge_base_ids: selectedBaseIds,
+          image_ids: selectedImageIds,
+          allow_web: allowWeb,
+        },
         {
           onMeta: ({ conversation_id }) => {
             streamConversationId = conversation_id;
             setActiveId(conversation_id);
           },
+          onAgentStarted: () => setPhase("planning"),
+          onAgentFallback: () => message.info("当前模型已降级为 ReAct 工具编排"),
+          onToolStarted: (call) => {
+            setPhase("retrieving");
+            upsertToolCall(assistantId, call);
+          },
+          onToolCompleted: (call) => upsertToolCall(assistantId, call),
           onRetrievalStarted: () => setPhase("retrieving"),
           onRetrievalCompleted: () => setPhase("generating"),
           onCitation: (citations) => updateAssistant(assistantId, (item) => ({ ...item, citations })),
@@ -159,6 +234,7 @@ export function ChatPage() {
       );
       if (streamError) throw new Error(streamError);
       setPhase("idle");
+      setSelectedImageIds([]);
       const refreshed = await loadConversations();
       const current = refreshed.find((item) => item.id === streamConversationId) || refreshed[0];
       if (current) {
@@ -206,6 +282,23 @@ export function ChatPage() {
             disabled={sending}
             suffixIcon={<BookOutlined />}
           />
+          <Space className="chat-agent-controls" wrap>
+            <Select
+              mode="multiple"
+              maxTagCount={1}
+              value={selectedImageIds}
+              placeholder="附加图片"
+              options={images.map((item) => ({ label: item.file_name, value: item.id }))}
+              onChange={(values) => setSelectedImageIds(values.slice(-3))}
+              disabled={sending}
+              suffixIcon={<PaperClipOutlined />}
+            />
+            <span className="web-toggle">
+              <GlobalOutlined />
+              允许联网
+              <Switch checked={allowWeb} onChange={setAllowWeb} disabled={sending} />
+            </span>
+          </Space>
         </header>
 
         <section className="message-space">
@@ -223,6 +316,27 @@ export function ChatPage() {
               <Avatar className="message-avatar">{item.role === "user" ? "我" : "星"}</Avatar>
               <div className="message-body">
                 <div className="message-role">{item.role === "user" ? "你" : "星航仪"}{item.streaming && <Tag color="processing">生成中</Tag>}</div>
+                {item.attachments && item.attachments.length > 0 && (
+                  <div className="message-attachments">
+                    {item.attachments.map((attachment) => (
+                      <div key={attachment.image_id} title={attachment.file_name}>
+                        <AuthenticatedImage imageId={attachment.image_id} alt={attachment.file_name} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {item.tool_calls && item.tool_calls.length > 0 && (
+                  <div className="tool-trace">
+                    {item.tool_calls.map((call, index) => (
+                      <div className={`tool-trace-item ${call.status}`} key={call.tool_call_id || `${call.name}-${index}`}>
+                        <span>{call.status === "running" ? <LoadingOutlined spin /> : call.status === "completed" ? "✓" : "!"}</span>
+                        <strong>{toolLabel(call.name)}</strong>
+                        {call.status === "completed" && <small>{call.hit_count ?? Number(call.metadata?.hit_count || 0)} 条结果</small>}
+                        {call.status === "failed" && <small>{call.error || "调用失败"}</small>}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="message-content">{item.content || (item.streaming ? "正在读取知识坐标…" : "")}</div>
                 {item.citations.length > 0 && (
                   <div className="message-citations">
@@ -254,8 +368,20 @@ export function ChatPage() {
       </main>
 
       <Drawer title={`引用 [${activeCitation?.index || ""}]`} open={Boolean(activeCitation)} onClose={() => setActiveCitation(undefined)} size={460}>
-        {activeCitation && <div className="citation-drawer"><Tag color="green">知识库文档</Tag><Title level={3}>{activeCitation.title}</Title><Text type="secondary">{activeCitation.file_name || activeCitation.locator?.file_name || activeCitation.title}{(activeCitation.page ?? activeCitation.locator?.page) ? ` · 第 ${activeCitation.page ?? activeCitation.locator?.page} 页` : ""}</Text><Paragraph>{activeCitation.quote}</Paragraph>{activeCitation.score != null && <Text type="secondary">检索相关度：{Math.round(activeCitation.score * 100)}%</Text>}</div>}
+        {activeCitation && <div className="citation-drawer"><Tag color="green">{sourceLabel(activeCitation.source_type)}</Tag><Title level={3}>{activeCitation.title}</Title><Text type="secondary">{activeCitation.file_name || activeCitation.locator?.file_name || activeCitation.title}{(activeCitation.page ?? activeCitation.locator?.page) ? ` · 第 ${activeCitation.page ?? activeCitation.locator?.page} 页` : ""}</Text>{activeCitation.url && <Typography.Link href={activeCitation.url} target="_blank" rel="noreferrer">{activeCitation.url}</Typography.Link>}<Paragraph>{activeCitation.quote}</Paragraph>{activeCitation.score != null && <Text type="secondary">检索相关度：{Math.round(activeCitation.score * 100)}%</Text>}</div>}
       </Drawer>
     </div>
   );
+}
+
+function toolLabel(name: string) {
+  return ({
+    knowledge_search: "搜索知识库",
+    memory_search: "搜索长期记忆",
+    web_search: "联网搜索",
+  } as Record<string, string>)[name] || name;
+}
+
+function sourceLabel(type: string) {
+  return ({ document: "知识库文档", memory: "长期记忆", web: "网页资料" } as Record<string, string>)[type] || type;
 }
