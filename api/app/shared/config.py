@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     bailian_rerank_model: str = "qwen3-rerank"
     bailian_workspace_id: str = ""
     bailian_rerank_base_url: str = ""
+    agent_mode: str = "auto"
+    agent_max_steps: int = 4
+    agent_tool_timeout_seconds: float = 30.0
+    agent_react_model: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

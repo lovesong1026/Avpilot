@@ -50,6 +50,50 @@ class BailianGateway:
             request["tool_choice"] = "auto"
         return await self.client.chat.completions.create(**request)
 
+    async def web_search(self, query: str, *, top_k: int = 5) -> list[dict[str, str]]:
+        """Use Bailian's built-in web search and normalize sources for the agent."""
+        response = await self.client.chat.completions.create(
+            model=self.settings.bailian_chat_model,
+            temperature=0.0,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "你是联网检索适配器。基于联网搜索结果，只返回 JSON 对象："
+                        '{"results":[{"title":"标题","url":"https://...",'
+                        '"excerpt":"与问题直接相关的事实摘要"}]}。'
+                        "URL 必须来自真实搜索结果，不得编造；没有可靠来源时 results 返回空数组。"
+                    ),
+                },
+                {"role": "user", "content": f"搜索：{query}\n最多返回 {top_k} 条。"},
+            ],
+            extra_body={
+                "enable_search": True,
+                "search_options": {
+                    "forced_search": True,
+                    "search_strategy": "turbo",
+                },
+            },
+        )
+        content = response.choices[0].message.content
+        if not content:
+            return []
+        body = _parse_json_object(content)
+        rows = body.get("results")
+        if not isinstance(rows, list):
+            return []
+        output: list[dict[str, str]] = []
+        for row in rows[:top_k]:
+            if not isinstance(row, dict):
+                continue
+            url = str(row.get("url") or "").strip()
+            title = str(row.get("title") or "").strip()
+            excerpt = str(row.get("excerpt") or "").strip()
+            if not url.startswith(("http://", "https://")) or not title or not excerpt:
+                continue
+            output.append({"title": title[:512], "url": url[:2048], "excerpt": excerpt[:4000]})
+        return output
+
     async def stream_chat(
         self,
         messages: Sequence[ChatCompletionMessageParam],

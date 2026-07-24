@@ -2,13 +2,14 @@
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from typing import Any
 
 import tiktoken
 
 from app.domain.chunking import ChildChunk, ParentChunk
 
 _BOUNDARY = re.compile(r"(?<=[。！？!?；;\.])\s*|\n+")
-_ENCODER = tiktoken.get_encoding("cl100k_base")
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,7 +21,22 @@ class _Segment:
 
 
 def count_tokens(text: str) -> int:
-    return len(_ENCODER.encode(text))
+    encoder = _encoder()
+    if encoder is not None:
+        return len(encoder.encode(text))
+    # Deterministic offline approximation: CJK characters are usually close to one
+    # token, while latin text averages roughly four characters per token.
+    cjk = len(re.findall(r"[\u3400-\u9fff]", text))
+    other = len(re.sub(r"[\u3400-\u9fff\s]", "", text))
+    return cjk + max(1, (other + 3) // 4) if text else 0
+
+
+@lru_cache(maxsize=1)
+def _encoder() -> Any | None:
+    try:
+        return tiktoken.get_encoding("cl100k_base")
+    except Exception:
+        return None
 
 
 def chunk_text(
