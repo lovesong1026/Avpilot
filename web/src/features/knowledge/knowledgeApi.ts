@@ -46,6 +46,13 @@ export const knowledgeApi = {
     await apiClient.delete(`/knowledge-bases/documents/${documentId}`);
   },
 
+  async retryDocument(documentId: string): Promise<KnowledgeDocument> {
+    const response = await apiClient.post<KnowledgeDocument>(
+      `/knowledge-bases/documents/${documentId}/retry`,
+    );
+    return response.data;
+  },
+
   async search(
     knowledgeBaseId: string,
     query: string,

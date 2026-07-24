@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 
 from app.api.dependencies import CurrentUser, SessionDependency
@@ -18,9 +18,13 @@ from app.application.images import (
     ImageNotFoundError,
     ImageService,
     InvalidImageUploadError,
-    process_image,
 )
 from app.application.knowledge_search import search_image_assets
+from app.application.task_queue import (
+    dispatch_outbox,
+    prepare_ingestion_retry,
+    task_dedupe_key,
+)
 from app.infrastructure.database.models.knowledge import ImageAsset, IngestionJob
 from app.infrastructure.database.repositories.knowledge import KnowledgeRepository
 from app.infrastructure.database.repositories.tags import TagRepository
@@ -63,7 +67,6 @@ async def list_images(
 
 @router.post("", response_model=ImageAssetResponse, status_code=status.HTTP_202_ACCEPTED)
 async def upload_image(
-    background_tasks: BackgroundTasks,
     user: CurrentUser,
     session: SessionDependency,
     knowledge_base_id: Annotated[uuid.UUID, Form()],
@@ -81,8 +84,34 @@ async def upload_image(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ImageConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    background_tasks.add_task(process_image, image.id, job.id)
+    await dispatch_outbox(task_dedupe_key("image", job.id))
     return _image_response(image, job)
+
+
+@router.post("/{image_id}/retry", response_model=ImageAssetResponse)
+async def retry_image(
+    image_id: uuid.UUID, user: CurrentUser, session: SessionDependency
+) -> ImageAssetResponse:
+    try:
+        job, key = await prepare_ingestion_retry(
+            session,
+            user_id=user.id,
+            target_type="image",
+            target_id=image_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await dispatch_outbox(key)
+    image = await KnowledgeRepository(session).get_image(user.id, image_id)
+    if image is None:
+        raise HTTPException(status_code=404, detail="图片不存在")
+    return _image_response(
+        image,
+        job,
+        await TagRepository(session).image_tags(image.id),
+    )
 
 
 @router.post("/search", response_model=ImageSearchResponse)

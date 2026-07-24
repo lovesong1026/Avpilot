@@ -12,6 +12,12 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.task_queue import (
+    MEMORY_TASK,
+    dispatch_outbox,
+    enqueue_task,
+    task_dedupe_key,
+)
 from app.infrastructure.database.models.memory import MemorySource
 from app.infrastructure.database.postgres import get_session_factory
 from app.infrastructure.database.repositories.memory import MemoryRepository
@@ -40,12 +46,22 @@ async def create_memory_source(
         status="pending",
     )
     MemoryRepository(session).add(source)
+    await session.flush()
+    enqueue_task(
+        session,
+        task_name=MEMORY_TASK,
+        queue="memory",
+        dedupe_key=task_dedupe_key("memory", source.id),
+        payload={"source_id": str(source.id)},
+    )
     await session.commit()
     await session.refresh(source)
     return source
 
 
-async def process_memory_source(source_id: uuid.UUID) -> None:
+async def process_memory_source(
+    source_id: uuid.UUID, *, raise_on_failure: bool = False
+) -> None:
     """Run extraction outside the request session and persist an auditable status."""
     gateway: BailianGateway | None = None
     async with get_session_factory()() as session:
@@ -72,6 +88,8 @@ async def process_memory_source(source_id: uuid.UUID) -> None:
             source.error_code = type(exc).__name__[:64]
             source.error_message = str(exc)[:2000]
             await session.commit()
+            if raise_on_failure:
+                raise
         finally:
             if gateway is not None:
                 await gateway.close()
@@ -126,7 +144,7 @@ async def _prepare_and_write(
     fragment_texts = _split_fragments(source.raw_text)
     fragments = [
         {
-            "id": uuid.uuid4().hex,
+            "id": uuid.uuid5(source.id, f"{index}:{value}").hex,
             "user_id": str(source.user_id),
             "text": value,
             "sequence": index,
@@ -372,7 +390,7 @@ def extraction_preview(value: dict[str, Any]) -> str:
 async def extract_conversation_memory(
     user_id: uuid.UUID, text: str, source_message_id: uuid.UUID
 ) -> None:
-    """Create and process a conversation memory in a detached coroutine."""
+    """Persist and dispatch conversation memory without running extraction in the API."""
     try:
         async with get_session_factory()() as session:
             source = await create_memory_source(
@@ -382,6 +400,6 @@ async def extract_conversation_memory(
                 source_type="conversation",
                 source_message_id=source_message_id,
             )
-        await process_memory_source(source.id)
+        await dispatch_outbox(task_dedupe_key("memory", source.id))
     except Exception:
         logger.exception("Could not dispatch conversation memory: message=%s", source_message_id)

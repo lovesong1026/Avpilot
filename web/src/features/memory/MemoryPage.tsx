@@ -3,6 +3,7 @@ import {
   ClockCircleOutlined,
   DeleteOutlined,
   RadarChartOutlined,
+  RedoOutlined,
   SaveOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
@@ -25,6 +26,7 @@ const { TextArea } = Input;
 const statusMeta: Record<MemorySource["status"], { label: string; color: string }> = {
   pending: { label: "等待萃取", color: "default" },
   extracting: { label: "正在萃取", color: "processing" },
+  retrying: { label: "等待重试", color: "warning" },
   completed: { label: "已进入图谱", color: "success" },
   failed: { label: "萃取失败", color: "error" },
 };
@@ -67,7 +69,7 @@ export function MemoryPage() {
   }, [load, message]);
 
   useEffect(() => {
-    if (!sources.some((item) => ["pending", "extracting"].includes(item.status))) return;
+    if (!sources.some((item) => ["pending", "extracting", "retrying"].includes(item.status))) return;
     const timer = window.setInterval(() => void load(), 1800);
     return () => window.clearInterval(timer);
   }, [load, sources]);
@@ -106,6 +108,16 @@ export function MemoryPage() {
         message.success("记忆来源已删除");
       },
     });
+  };
+
+  const retry = async (source: MemorySource) => {
+    try {
+      await memoryApi.retry(source.id);
+      await load();
+      message.success("记忆已重新进入萃取队列");
+    } catch (error) {
+      message.error(apiErrorMessage(error, "重新萃取失败"));
+    }
   };
 
   return (
@@ -157,7 +169,10 @@ export function MemoryPage() {
                 {source.error_message && <Text type="danger">{source.error_message}</Text>}
                 <div className="memory-source-foot">
                   <Text type="secondary">{new Date(source.created_at).toLocaleString("zh-CN")}</Text>
-                  <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => remove(source)} />
+                  <Space>
+                    {source.status === "failed" && <Button type="text" size="small" icon={<RedoOutlined />} onClick={() => void retry(source)}>重试</Button>}
+                    <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => remove(source)} />
+                  </Space>
                 </div>
               </article>
             ))}

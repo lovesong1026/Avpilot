@@ -41,6 +41,7 @@ class IngestionJobResponse(BaseModel):
     status: str
     stage: str
     progress: float
+    attempts: int
     error_code: str | None
     error_message: str | None
     updated_at: datetime

@@ -12,12 +12,14 @@
 - [v0.5 可溯源长期记忆](docs/v0.5-traceable-memory.md)
 - [v0.6 搜索导航与可视化](docs/v0.6-search-and-visualization.md)
 - [v0.7 智能 Agent Workflow](docs/v0.7-agent-workflow.md)
+- [v0.8 可靠任务系统](docs/v0.8-reliable-tasks.md)
 
 ## 当前阶段
 
-项目已完成 v0.7 智能 Agent Workflow：LangChain Agent 可以自主组合知识库、长期记忆和联网搜索；强模型使用原生 Function Calling，不兼容时降级为 ReAct。SSE 会实时展示工具轨迹和统一引用，问答支持从图片库附加图片进行多模态理解。
-
-下一条交付主线将进入 v0.8 可靠任务系统：把进程内入库和记忆萃取迁移到 Redis/Celery，增加重试、幂等、任务恢复和可观测性。
+项目已完成 v0.8 可靠任务系统：文档、网页、图片和记忆处理已从 FastAPI
+进程迁移到 Redis/Celery 多队列；PostgreSQL Transactional Outbox 保证任务意图
+与业务记录一起提交，并由 Beat 自动补投、恢复中断任务。任务支持晚确认、Worker
+异常重新投递、指数退避、幂等认领、超时、失败状态和用户手动重试。
 
 ## 版本演进路线
 
@@ -32,6 +34,7 @@
 | v0.5 长期记忆 | ✅ 已完成 | 从主动记忆和对话中提取三元组，建立 `来源 → 片段 → 陈述 → 实体` 四层 Neo4j 图谱；增加事件时间线、两层去重和社区聚类。 |
 | v0.6 搜索与可视化 | ✅ 已完成 | 实现文档、图片、记忆三类全局搜索，补充收藏、标签管理、每日回顾、AntV X6 知识图谱和 ECharts 统计仪表盘。 |
 | v0.7 智能 Agent | ✅ 已完成 | 使用 LangChain 自主编排知识库、长期记忆和可选联网搜索；支持 Function Calling/ReAct 双模式、SSE 工具轨迹、统一引用、Token 刷新和图片多模态问答。 |
+| v0.8 可靠任务系统 | ✅ 已完成 | 使用 Redis/Celery 的 ingestion、memory、maintenance 队列迁移耗时任务；加入事务型 Outbox、晚确认、指数退避、任务认领、Beat 补投与卡死恢复，并支持前端手动重试。 |
 
 ### 已完成的改进记录
 
@@ -118,6 +121,21 @@
 - 支持从图片库附加最多三张图片，由百炼视觉模型进行看图问答。
 - 修复聊天流绕过 Axios 后无法自动刷新 Access Token 的问题。
 
+#### 10. 可靠任务系统
+
+- 文档、网页、图片和记忆萃取不再由 FastAPI `BackgroundTasks` 或脱离请求的
+  `asyncio.create_task` 执行。
+- PostgreSQL 在创建业务记录的同一事务中写入 `task_outbox`；Redis 暂时不可用时，
+  Celery Beat 会在恢复后补投，避免任务永久停留在 `pending`。
+- Celery 按 `ingestion`、`memory`、`maintenance` 三队列隔离任务，并启用
+  `acks_late`、Worker 丢失重入队、单任务预取、软硬超时和 Redis 可见性窗口。
+- 临时错误最多自动重试四次，使用 30 秒起步的指数退避；解析错误、文件不存在和
+  安全校验错误直接失败。
+- Outbox 通过数据库行锁认领任务，过滤并发重复投递；ES 写入前删除旧索引，
+  Neo4j 延续业务键 `MERGE`，实现至少一次投递下的幂等收敛。
+- Beat 每 30 秒补投 Outbox，每分钟检查中断任务，每天重建记忆社区。
+- 文档、图片和记忆页面在失败后提供手动重试入口。
+
 ### 后续实施原则
 
 - 每一版先完成一条可以真实验收的纵向闭环，再扩展更多输入类型和工具。
@@ -148,9 +166,20 @@ npm run dev
 
 ```bash
 cp .env.example .env
-docker compose up -d
+docker compose up -d postgres elasticsearch neo4j redis
 cd api
 uv run alembic upgrade head
+cd ..
+docker compose up -d worker beat
+```
+
+也可以在宿主机直接启动任务进程：
+
+```bash
+cd api
+uv run celery -A app.worker.celery_app worker -l INFO \
+  -Q ingestion,memory,maintenance --concurrency=2
+uv run celery -A app.worker.celery_app beat -l INFO
 ```
 
 健康检查：

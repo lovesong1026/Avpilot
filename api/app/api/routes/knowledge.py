@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 from app.api.dependencies import CurrentUser, SessionDependency
 from app.api.schemas.knowledge import (
@@ -21,10 +21,13 @@ from app.application.knowledge import (
     KnowledgeConflictError,
     KnowledgeNotFoundError,
     KnowledgeService,
-    process_document,
-    process_web_document,
 )
 from app.application.knowledge_search import search_knowledge_base
+from app.application.task_queue import (
+    dispatch_outbox,
+    prepare_ingestion_retry,
+    task_dedupe_key,
+)
 from app.infrastructure.database.models.knowledge import Document, IngestionJob, KnowledgeBase
 from app.infrastructure.database.repositories.knowledge import KnowledgeRepository
 from app.infrastructure.database.repositories.tags import TagRepository
@@ -109,7 +112,6 @@ async def list_documents(
 )
 async def upload_document(
     knowledge_base_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     user: CurrentUser,
     session: SessionDependency,
     file: Annotated[UploadFile, File()],
@@ -126,7 +128,7 @@ async def upload_document(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except KnowledgeConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    background_tasks.add_task(process_document, document.id, job.id)
+    await dispatch_outbox(task_dedupe_key("document", job.id))
     return _document_response(document, job)
 
 
@@ -138,7 +140,6 @@ async def upload_document(
 async def add_web_page(
     knowledge_base_id: uuid.UUID,
     request: WebDocumentCreate,
-    background_tasks: BackgroundTasks,
     user: CurrentUser,
     session: SessionDependency,
 ) -> DocumentResponse:
@@ -152,8 +153,34 @@ async def add_web_page(
         raise HTTPException(status_code=404, detail="知识库不存在") from exc
     except KnowledgeConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    background_tasks.add_task(process_web_document, document.id, job.id)
+    await dispatch_outbox(task_dedupe_key("document", job.id))
     return _document_response(document, job)
+
+
+@router.post("/documents/{document_id}/retry", response_model=DocumentResponse)
+async def retry_document(
+    document_id: uuid.UUID, user: CurrentUser, session: SessionDependency
+) -> DocumentResponse:
+    try:
+        job, key = await prepare_ingestion_retry(
+            session,
+            user_id=user.id,
+            target_type="document",
+            target_id=document_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await dispatch_outbox(key)
+    document = await KnowledgeRepository(session).get_document(user.id, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    return _document_response(
+        document,
+        job,
+        await TagRepository(session).document_tags(document.id),
+    )
 
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

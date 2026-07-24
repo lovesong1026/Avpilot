@@ -29,15 +29,6 @@ from app.infrastructure.storage.local import LocalDocumentStorage
 from app.shared.config import get_settings
 
 logger = logging.getLogger(__name__)
-_memory_tasks: set[asyncio.Task[None]] = set()
-
-
-def _dispatch_conversation_memory(
-    user_id: uuid.UUID, text: str, source_message_id: uuid.UUID
-) -> None:
-    task = asyncio.create_task(extract_conversation_memory(user_id, text, source_message_id))
-    _memory_tasks.add(task)
-    task.add_done_callback(_memory_tasks.discard)
 
 
 class ConversationNotFoundError(Exception):
@@ -291,7 +282,7 @@ async def stream_chat_turn(
                 usage,
                 run.tool_calls,
             )
-            _dispatch_conversation_memory(user_id, request.message.strip(), user_message.id)
+            await extract_conversation_memory(user_id, request.message.strip(), user_message.id)
             yield format_sse(
                 "agent_completed",
                 {

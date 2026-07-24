@@ -3,6 +3,7 @@ import {
   DeleteOutlined,
   EyeOutlined,
   PictureOutlined,
+  RedoOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import {
@@ -44,6 +45,9 @@ const stageLabels: Record<string, string> = {
   indexing: "建立索引",
   completed: "处理完成",
   failed: "处理失败",
+  dispatch_failed: "等待任务队列恢复",
+  retry_wait: "等待自动重试",
+  recovered: "任务已恢复",
 };
 
 function formatSize(bytes: number) {
@@ -145,6 +149,16 @@ export function ImageLibraryPage() {
     });
   };
 
+  const retryImage = async (image: ImageAsset) => {
+    try {
+      await imageApi.retry(image.id);
+      if (selectedBaseId) await loadImages(selectedBaseId);
+      message.success("图片已重新进入分析队列");
+    } catch (error) {
+      message.error(apiErrorMessage(error, "重新分析失败"));
+    }
+  };
+
   const visibleImages = query
     ? hits.map((hit) => ({ image: imageById.get(hit.image_id), hit })).filter((item) => item.image)
     : images.map((image) => ({ image, hit: undefined }));
@@ -213,7 +227,7 @@ export function ImageLibraryPage() {
                 {image.tags.length > 0 && <Space wrap size={4} className="content-tags">{image.tags.map((tag) => <Tag key={tag.id} color={tag.color}>{tag.name}</Tag>)}</Space>}
                 {image.status === "processing" && image.ingestion_job && <Progress percent={Math.round(image.ingestion_job.progress * 100)} size="small" format={() => stageLabels[image.ingestion_job?.stage || ""] || "处理中"} />}
                 {image.status === "failed" && <Text type="danger">{image.error_message}</Text>}
-                <div className="image-card-actions"><Text type="secondary">{formatSize(image.file_size)}</Text><Space><Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setActiveImage(image)}>详情</Button><Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => removeImage(image)} /></Space></div>
+                <div className="image-card-actions"><Text type="secondary">{formatSize(image.file_size)}</Text><Space>{image.status === "failed" && <Button type="text" size="small" icon={<RedoOutlined />} onClick={() => void retryImage(image)}>重试</Button>}<Button type="text" size="small" icon={<EyeOutlined />} onClick={() => setActiveImage(image)}>详情</Button><Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => removeImage(image)} /></Space></div>
               </div>
             </article>
           ))}

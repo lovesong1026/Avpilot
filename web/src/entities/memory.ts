@@ -3,7 +3,7 @@ export type MemorySource = {
   raw_text: string;
   source_type: "manual" | "conversation";
   source_message_id: string | null;
-  status: "pending" | "extracting" | "completed" | "failed";
+  status: "pending" | "extracting" | "retrying" | "completed" | "failed";
   graph_source_id: string | null;
   graph_stats: Record<string, number> | null;
   error_message: string | null;
@@ -49,4 +49,3 @@ export type MemoryCommunity = {
   member_count: number;
   members: Array<{ id: string; name: string }>;
 };
-

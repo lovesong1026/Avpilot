@@ -39,4 +39,9 @@ export const imageApi = {
   async remove(imageId: string): Promise<void> {
     await apiClient.delete(`/images/${imageId}`);
   },
+
+  async retry(imageId: string): Promise<ImageAsset> {
+    const response = await apiClient.post<ImageAsset>(`/images/${imageId}/retry`);
+    return response.data;
+  },
 };

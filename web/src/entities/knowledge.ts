@@ -12,9 +12,10 @@ export type KnowledgeBase = {
 
 export type IngestionJob = {
   id: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: "pending" | "processing" | "retrying" | "completed" | "failed";
   stage: string;
   progress: number;
+  attempts: number;
   error_code: string | null;
   error_message: string | null;
   updated_at: string;

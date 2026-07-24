@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.dependencies import CurrentUser, SessionDependency
 from app.api.schemas.memory import (
@@ -14,7 +14,12 @@ from app.api.schemas.memory import (
     MemorySourceResponse,
     TimelineItem,
 )
-from app.application.memory import create_memory_source, process_memory_source
+from app.application.memory import create_memory_source
+from app.application.task_queue import (
+    dispatch_outbox,
+    prepare_memory_retry,
+    task_dedupe_key,
+)
 from app.infrastructure.database.repositories.memory import MemoryRepository
 from app.infrastructure.graph.memory_graph import MemoryGraphRepository
 
@@ -24,14 +29,29 @@ router = APIRouter(prefix="/memories", tags=["memory"])
 @router.post("", response_model=MemorySourceResponse, status_code=status.HTTP_202_ACCEPTED)
 async def remember(
     request: MemoryCreate,
-    background_tasks: BackgroundTasks,
     user: CurrentUser,
     session: SessionDependency,
 ) -> MemorySourceResponse:
     source = await create_memory_source(
         session, user_id=user.id, text=request.text, source_type="manual"
     )
-    background_tasks.add_task(process_memory_source, source.id)
+    await dispatch_outbox(task_dedupe_key("memory", source.id))
+    return MemorySourceResponse.model_validate(source)
+
+
+@router.post("/{source_id}/retry", response_model=MemorySourceResponse)
+async def retry_memory(
+    source_id: uuid.UUID, user: CurrentUser, session: SessionDependency
+) -> MemorySourceResponse:
+    try:
+        source, key = await prepare_memory_retry(
+            session, user_id=user.id, source_id=source_id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await dispatch_outbox(key)
     return MemorySourceResponse.model_validate(source)
 
 

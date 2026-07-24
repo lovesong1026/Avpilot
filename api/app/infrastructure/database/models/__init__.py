@@ -19,6 +19,7 @@ from app.infrastructure.database.models.knowledge import (
 )
 from app.infrastructure.database.models.memory import MemorySource
 from app.infrastructure.database.models.review import DailyReview
+from app.infrastructure.database.models.task import TaskOutbox
 
 __all__ = [
     "Citation",
@@ -33,6 +34,7 @@ __all__ = [
     "Message",
     "RefreshToken",
     "Tag",
+    "TaskOutbox",
     "User",
     "conversation_knowledge_bases",
     "document_tags",

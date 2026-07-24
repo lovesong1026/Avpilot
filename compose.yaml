@@ -1,5 +1,14 @@
 name: avpilot
 
+x-worker-environment: &worker-environment
+  POSTGRES_HOST: postgres
+  ELASTICSEARCH_URL: http://elasticsearch:9200
+  NEO4J_URI: bolt://neo4j:7687
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  STORAGE_PATH: /app/storage
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -52,6 +61,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
     ports:
       - "6379:6379"
     volumes:
@@ -62,8 +72,62 @@ services:
       timeout: 5s
       retries: 5
 
+  worker:
+    build: ./api
+    env_file: .env
+    environment: *worker-environment
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "worker",
+        "-l",
+        "INFO",
+        "-Q",
+        "ingestion,memory,maintenance",
+        "--concurrency=2",
+      ]
+    volumes:
+      - ./api/storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  beat:
+    build: ./api
+    env_file: .env
+    environment: *worker-environment
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "beat",
+        "-l",
+        "INFO",
+        "--schedule",
+        "/app/beat-data/celerybeat-schedule",
+      ]
+    volumes:
+      - beat_data:/app/beat-data
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   elasticsearch_data:
   neo4j_data:
   redis_data:
+  beat_data:

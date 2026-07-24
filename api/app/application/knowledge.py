@@ -16,6 +16,12 @@ from app.application.document_parser import (
     DocumentParseError,
     parse_document,
 )
+from app.application.task_queue import (
+    DOCUMENT_TASK,
+    WEB_DOCUMENT_TASK,
+    enqueue_task,
+    task_dedupe_key,
+)
 from app.application.web_crawler import fetch_web_page
 from app.infrastructure.database.models.knowledge import Document, IngestionJob, KnowledgeBase
 from app.infrastructure.database.postgres import get_session_factory
@@ -145,6 +151,14 @@ class KnowledgeService:
             attempts=0,
         )
         self.repository.add_job(job)
+        await self.session.flush()
+        enqueue_task(
+            self.session,
+            task_name=DOCUMENT_TASK,
+            queue="ingestion",
+            dedupe_key=task_dedupe_key("document", job.id),
+            payload={"document_id": str(document.id), "job_id": str(job.id)},
+        )
         try:
             await self.storage.save(document.file_key, content)
             await self.session.commit()
@@ -201,6 +215,14 @@ class KnowledgeService:
             attempts=0,
         )
         self.repository.add_job(job)
+        await self.session.flush()
+        enqueue_task(
+            self.session,
+            task_name=WEB_DOCUMENT_TASK,
+            queue="ingestion",
+            dedupe_key=task_dedupe_key("document", job.id),
+            payload={"document_id": str(document.id), "job_id": str(job.id)},
+        )
         await self.session.commit()
         await self.session.refresh(document)
         await self.session.refresh(job)
@@ -208,7 +230,11 @@ class KnowledgeService:
 
 
 async def process_document(
-    document_id: uuid.UUID, job_id: uuid.UUID, *, increment_attempt: bool = True
+    document_id: uuid.UUID,
+    job_id: uuid.UUID,
+    *,
+    increment_attempt: bool = True,
+    raise_on_failure: bool = False,
 ) -> None:
     """Process one persisted upload in a fresh session after the response is returned."""
     async with get_session_factory()() as session:
@@ -301,12 +327,19 @@ async def process_document(
                 job.error_code = type(exc).__name__
                 job.error_message = error_message
             await session.commit()
+            if raise_on_failure:
+                raise
         finally:
             if gateway is not None:
                 await gateway.close()
 
 
-async def process_web_document(document_id: uuid.UUID, job_id: uuid.UUID) -> None:
+async def process_web_document(
+    document_id: uuid.UUID,
+    job_id: uuid.UUID,
+    *,
+    raise_on_failure: bool = False,
+) -> None:
     """Fetch a public page safely, persist its text snapshot, then run document ingestion."""
     async with get_session_factory()() as session:
         document = await session.get(Document, document_id)
@@ -347,5 +380,12 @@ async def process_web_document(document_id: uuid.UUID, job_id: uuid.UUID) -> Non
                 job.error_code = type(exc).__name__
                 job.error_message = error_message
             await session.commit()
+            if raise_on_failure:
+                raise
             return
-    await process_document(document_id, job_id, increment_attempt=False)
+    await process_document(
+        document_id,
+        job_id,
+        increment_attempt=False,
+        raise_on_failure=raise_on_failure,
+    )

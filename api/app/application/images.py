@@ -18,6 +18,7 @@ from app.application.image_processing import (
     normalize_vision_result,
     prepare_image_for_vision,
 )
+from app.application.task_queue import IMAGE_TASK, enqueue_task, task_dedupe_key
 from app.infrastructure.database.models.knowledge import ImageAsset, IngestionJob
 from app.infrastructure.database.postgres import get_session_factory
 from app.infrastructure.database.repositories.knowledge import KnowledgeRepository
@@ -104,6 +105,14 @@ class ImageService:
             attempts=0,
         )
         self.repository.add_job(job)
+        await self.session.flush()
+        enqueue_task(
+            self.session,
+            task_name=IMAGE_TASK,
+            queue="ingestion",
+            dedupe_key=task_dedupe_key("image", job.id),
+            payload={"image_id": str(image.id), "job_id": str(job.id)},
+        )
         try:
             await self.storage.save(image.file_key, content)
             await self.session.commit()
@@ -126,7 +135,12 @@ class ImageService:
         await self.storage.delete(file_key)
 
 
-async def process_image(image_id: uuid.UUID, job_id: uuid.UUID) -> None:
+async def process_image(
+    image_id: uuid.UUID,
+    job_id: uuid.UUID,
+    *,
+    raise_on_failure: bool = False,
+) -> None:
     """Analyze and index one persisted image in a fresh database session."""
     async with get_session_factory()() as session:
         image = await session.get(ImageAsset, image_id)
@@ -208,6 +222,8 @@ async def process_image(image_id: uuid.UUID, job_id: uuid.UUID) -> None:
                 job.error_code = type(exc).__name__
                 job.error_message = error_message
             await session.commit()
+            if raise_on_failure:
+                raise
         finally:
             if gateway is not None:
                 await gateway.close()

@@ -5,6 +5,7 @@ import {
   FileTextOutlined,
   LinkOutlined,
   PlusOutlined,
+  RedoOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import {
@@ -47,6 +48,9 @@ const stageLabels: Record<string, string> = {
   indexing: "建立索引",
   completed: "处理完成",
   failed: "处理失败",
+  dispatch_failed: "等待任务队列恢复",
+  retry_wait: "暂时失败，等待自动重试",
+  recovered: "检测到中断，已重新排队",
 };
 
 function formatSize(bytes: number) {
@@ -166,6 +170,16 @@ export function KnowledgePage() {
     });
   };
 
+  const retryDocument = async (document: KnowledgeDocument) => {
+    try {
+      await knowledgeApi.retryDocument(document.id);
+      if (selectedId) await loadDocuments(selectedId);
+      message.success("文档已重新进入处理队列");
+    } catch (error) {
+      message.error(apiErrorMessage(error, "重新处理失败"));
+    }
+  };
+
   const runSearch = async (query: string) => {
     if (!selectedId || !query.trim()) return;
     setSearching(true);
@@ -267,7 +281,12 @@ export function KnowledgePage() {
                           )}
                           {document.status === "failed" && <Text className="document-error" type="danger">{document.error_message}</Text>}
                         </div>
-                        <Button type="text" danger icon={<DeleteOutlined />} aria-label={`删除 ${document.title}`} onClick={() => removeDocument(document)} />
+                        <Space>
+                          {document.status === "failed" && (
+                            <Button type="text" icon={<RedoOutlined />} onClick={() => void retryDocument(document)}>重试</Button>
+                          )}
+                          <Button type="text" danger icon={<DeleteOutlined />} aria-label={`删除 ${document.title}`} onClick={() => removeDocument(document)} />
+                        </Space>
                       </article>
                     );
                   })}

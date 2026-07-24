@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
+    celery_visibility_timeout_seconds: int = 3600
+    task_stale_after_seconds: int = 1800
+    task_max_attempts: int = 5
     health_check_timeout_seconds: float = 3.0
     storage_path: str = "storage"
     max_upload_size_mb: int = 25

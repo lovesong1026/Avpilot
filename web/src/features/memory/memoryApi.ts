@@ -35,5 +35,9 @@ export const memoryApi = {
   async remove(sourceId: string): Promise<void> {
     await apiClient.delete(`/memories/${sourceId}`);
   },
-};
 
+  async retry(sourceId: string): Promise<MemorySource> {
+    const response = await apiClient.post<MemorySource>(`/memories/${sourceId}/retry`);
+    return response.data;
+  },
+};
