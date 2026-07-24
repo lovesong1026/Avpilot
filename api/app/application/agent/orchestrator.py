@@ -9,6 +9,7 @@ from typing import Any
 
 from openai.types.chat import ChatCompletionMessageParam
 
+from app.application.agent.langchain_runner import LangChainAgentRunner
 from app.application.agent.registry import AgentToolRegistry
 from app.application.agent.schemas import AgentRun
 from app.infrastructure.llm.bailian import BailianGateway
@@ -71,52 +72,16 @@ class AgentOrchestrator:
         image_context: str,
         on_event: AgentEventSink | None,
     ) -> AgentRun:
-        messages = self._initial_messages(question, history, image_context)
-        run = AgentRun(mode="native")
-        for _ in range(self.settings.agent_max_steps):
-            response = await self.gateway.chat(
-                messages,
-                tools=self.registry.schemas,
-                temperature=0.0,
-            )
-            message = response.choices[0].message
-            calls = list(message.tool_calls or [])
-            if not calls:
-                run.direct_answer = message.content or None
-                return run
-            messages.append(message.model_dump(exclude_none=True))  # type: ignore[arg-type]
-            for call in calls:
-                name = call.function.name
-                arguments = _json_arguments(call.function.arguments)
-                await _emit(
-                    on_event,
-                    "tool_started",
-                    {"tool_call_id": call.id, "name": name, "arguments": arguments},
-                )
-                result, record = await self.registry.execute(name, arguments)
-                record["tool_call_id"] = call.id
-                run.results.append(result)
-                run.tool_calls.append(record)
-                await _emit(
-                    on_event,
-                    "tool_completed",
-                    {
-                        "tool_call_id": call.id,
-                        "name": name,
-                        "status": record["status"],
-                        "duration_ms": record["duration_ms"],
-                        "hit_count": result.metadata.get("hit_count", 0),
-                        "error": record.get("error"),
-                    },
-                )
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": call.id,
-                        "content": result.model_dump_json(),
-                    }
-                )
-        return run
+        return await LangChainAgentRunner(
+            self.registry,
+            self.settings,
+            AGENT_SYSTEM_PROMPT,
+        ).run(
+            question=question,
+            history=history,
+            image_context=image_context,
+            on_event=on_event,
+        )
 
     async def _run_react(
         self,
@@ -186,33 +151,11 @@ class AgentOrchestrator:
             )
         return run
 
-    @staticmethod
-    def _initial_messages(
-        question: str,
-        history: Sequence[ChatCompletionMessageParam],
-        image_context: str,
-    ) -> list[ChatCompletionMessageParam]:
-        context = f"\n\n用户附带图片的已有分析：\n{image_context}" if image_context else ""
-        return [
-            {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-            *history[-6:],
-            {"role": "user", "content": question + context},
-        ]
-
-
 async def _emit(
     sink: AgentEventSink | None, event: str, payload: dict[str, Any]
 ) -> None:
     if sink is not None:
         await sink(event, payload)
-
-
-def _json_arguments(value: str) -> dict[str, Any]:
-    try:
-        parsed = json.loads(value or "{}")
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
 
 
 def _parse_react_action(content: str) -> dict[str, Any]:

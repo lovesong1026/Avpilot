@@ -26,6 +26,10 @@ class AgentToolRegistry:
     def names(self) -> list[str]:
         return list(self._tools)
 
+    @property
+    def tools(self) -> list[AgentTool]:
+        return list(self._tools.values())
+
     async def execute(
         self, name: str, arguments: dict[str, Any]
     ) -> tuple[ToolResult, dict[str, Any]]:
