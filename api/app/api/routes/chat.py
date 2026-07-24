@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from app.api.dependencies import CurrentUser, SessionDependency
 from app.api.schemas.chat import (
     ChatStreamRequest,
+    CitationResponse,
     ConversationCreate,
     ConversationResponse,
     ConversationUpdate,
@@ -102,7 +103,15 @@ async def list_messages(
 
 
 def _message_response(message: Message, citations: list[Citation]) -> MessageResponse:
-    return MessageResponse.model_validate(message).model_copy(update={"citations": citations})
+    citation_responses = [
+        CitationResponse.model_validate(item).model_copy(
+            update={"url": str((item.locator or {}).get("url") or "") or None}
+        )
+        for item in citations
+    ]
+    return MessageResponse.model_validate(message).model_copy(
+        update={"citations": citation_responses}
+    )
 
 
 @router.post("/chat/stream")

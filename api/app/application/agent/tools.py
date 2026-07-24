@@ -141,7 +141,7 @@ def build_agent_tools(context: AgentToolContext) -> list[AgentTool]:
         "required": ["query"],
         "additionalProperties": False,
     }
-    return [
+    tools = [
         AgentTool(
             name="knowledge_search",
             description="搜索当前用户选中的私人知识库，适合文档、论文和项目资料问题。",
@@ -154,13 +154,17 @@ def build_agent_tools(context: AgentToolContext) -> list[AgentTool]:
             parameters=common_parameters,
             handler=memory,
         ),
-        AgentTool(
-            name="web_search",
-            description="搜索互联网公开资料，适合最新、实时或知识库之外的信息。",
-            parameters=common_parameters,
-            handler=web,
-        ),
     ]
+    if context.allow_web:
+        tools.append(
+            AgentTool(
+                name="web_search",
+                description="搜索互联网公开资料，适合最新、实时或知识库之外的信息。",
+                parameters=common_parameters,
+                handler=web,
+            )
+        )
+    return tools
 
 
 def _query(arguments: dict[str, Any]) -> str:

@@ -37,6 +37,7 @@ class CitationResponse(BaseModel):
     locator: dict[str, object] | None
     quote: str
     score: float | None
+    url: str | None = None
 
 
 class MessageResponse(BaseModel):
@@ -46,6 +47,8 @@ class MessageResponse(BaseModel):
     conversation_id: uuid.UUID
     role: str
     content: str
+    attachments: list[dict[str, object]] | None
+    tool_calls: list[dict[str, object]] | None
     usage: dict[str, object] | None
     citations: list[CitationResponse] = Field(default_factory=list)
     created_at: datetime
@@ -55,3 +58,5 @@ class ChatStreamRequest(BaseModel):
     conversation_id: uuid.UUID | None = None
     message: str = Field(min_length=1, max_length=8000)
     knowledge_base_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
+    image_ids: list[uuid.UUID] = Field(default_factory=list, max_length=3)
+    allow_web: bool = False
