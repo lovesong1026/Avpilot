@@ -24,6 +24,11 @@ from app.infrastructure.database.models.observability import (
     ModelUsage,
     RetrievalSnapshot,
 )
+from app.infrastructure.database.models.research import (
+    ResearchEvidence,
+    ResearchStep,
+    ResearchTask,
+)
 from app.infrastructure.database.models.review import DailyReview
 from app.infrastructure.database.models.task import TaskOutbox
 
@@ -42,6 +47,9 @@ __all__ = [
     "Message",
     "ModelUsage",
     "RefreshToken",
+    "ResearchEvidence",
+    "ResearchStep",
+    "ResearchTask",
     "RetrievalSnapshot",
     "Tag",
     "TaskOutbox",

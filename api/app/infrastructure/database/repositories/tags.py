@@ -48,9 +48,7 @@ class TagRepository:
             raise RuntimeError("标签创建失败")
         return tag
 
-    async def set_document_tags(
-        self, document_id: uuid.UUID, tag_ids: list[uuid.UUID]
-    ) -> None:
+    async def set_document_tags(self, document_id: uuid.UUID, tag_ids: list[uuid.UUID]) -> None:
         await self.session.execute(
             delete(document_tags).where(document_tags.c.document_id == document_id)
         )
@@ -62,9 +60,7 @@ class TagRepository:
     async def set_image_tags(self, image_id: uuid.UUID, tag_ids: list[uuid.UUID]) -> None:
         await self.session.execute(delete(image_tags).where(image_tags.c.image_id == image_id))
         for tag_id in tag_ids:
-            await self.session.execute(
-                image_tags.insert().values(image_id=image_id, tag_id=tag_id)
-            )
+            await self.session.execute(image_tags.insert().values(image_id=image_id, tag_id=tag_id))
 
     async def document_tags(self, document_id: uuid.UUID) -> list[Tag]:
         statement = (

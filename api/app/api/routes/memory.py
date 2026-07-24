@@ -44,9 +44,7 @@ async def retry_memory(
     source_id: uuid.UUID, user: CurrentUser, session: SessionDependency
 ) -> MemorySourceResponse:
     try:
-        source, key = await prepare_memory_retry(
-            session, user_id=user.id, source_id=source_id
-        )
+        source, key = await prepare_memory_retry(session, user_id=user.id, source_id=source_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

@@ -28,9 +28,7 @@ async def summary(
     session: SessionDependency,
     days: int = Query(default=14, ge=1, le=90),
 ) -> ObservabilitySummary:
-    return ObservabilitySummary.model_validate(
-        await observability_summary(session, user.id, days)
-    )
+    return ObservabilitySummary.model_validate(await observability_summary(session, user.id, days))
 
 
 @router.get("/traces", response_model=list[AgentTraceItem])
@@ -54,9 +52,7 @@ async def trace_detail(
     return AgentTraceDetail.model_validate(trace).model_copy(
         update={
             "spans": [AgentSpanItem.model_validate(item) for item in spans],
-            "model_usages": [
-                ModelUsageItem.model_validate(item) for item in usages
-            ],
+            "model_usages": [ModelUsageItem.model_validate(item) for item in usages],
             "retrieval_snapshots": [
                 RetrievalSnapshotItem.model_validate(item) for item in snapshots
             ],

@@ -11,6 +11,7 @@ from app.api.routes import (
     memory,
     navigation,
     observability,
+    research,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -22,3 +23,4 @@ api_router.include_router(images.router)
 api_router.include_router(memory.router)
 api_router.include_router(navigation.router)
 api_router.include_router(observability.router)
+api_router.include_router(research.router)

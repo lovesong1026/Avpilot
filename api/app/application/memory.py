@@ -59,9 +59,7 @@ async def create_memory_source(
     return source
 
 
-async def process_memory_source(
-    source_id: uuid.UUID, *, raise_on_failure: bool = False
-) -> None:
+async def process_memory_source(source_id: uuid.UUID, *, raise_on_failure: bool = False) -> None:
     """Run extraction outside the request session and persist an auditable status."""
     gateway: BailianGateway | None = None
     async with get_session_factory()() as session:
@@ -122,9 +120,7 @@ async def _extract(gateway: BailianGateway, text: str) -> dict[str, Any]:
 待萃取文本：
 <memory>{text}</memory>
 """.strip()
-    response = await gateway.chat(
-        [{"role": "user", "content": prompt}], temperature=0.0
-    )
+    response = await gateway.chat([{"role": "user", "content": prompt}], temperature=0.0)
     content = response.choices[0].message.content
     if not content:
         return {"statements": []}
@@ -305,11 +301,7 @@ def _dedupe_entities(
     for value, embedding in zip(values, vectors, strict=True):
         key = (_normalize(value["name"]), value["entity_type"])
         exact = next(
-            (
-                row
-                for row in candidates
-                if row.get("normalized_name") == key[0]
-            ),
+            (row for row in candidates if row.get("normalized_name") == key[0]),
             None,
         )
         semantic = exact or max(

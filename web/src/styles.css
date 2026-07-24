@@ -180,6 +180,34 @@ button, input { font: inherit; }
 .citation-drawer h3.ant-typography { margin: 16px 0 5px; color: #234b3c; }
 .citation-drawer p.ant-typography { margin-top: 24px; padding: 18px; border-left: 3px solid #89a493; border-radius: 0 12px 12px 0; color: #48584f; background: #f2f6f1; line-height: 1.8; white-space: pre-wrap; }
 
+.research-page { display: grid; grid-template-columns: 276px minmax(0, 1fr); min-height: calc(100vh - 104px); overflow: hidden; border: 1px solid #dce6df; border-radius: 24px; background: #f8faf7; box-shadow: 0 18px 50px rgb(35 75 60 / 8%); }
+.research-rail { display: flex; flex-direction: column; gap: 18px; min-height: 0; padding: 24px 18px; border-right: 1px solid #dce6df; background: #edf3ec; }
+.research-task-list { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; }
+.research-task { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 9px; align-items: start; width: 100%; padding: 12px; border: 1px solid transparent; border-radius: 14px; color: #506158; background: transparent; text-align: left; cursor: pointer; }
+.research-task:hover, .research-task.active { border-color: #c8d9cc; color: #244f3d; background: white; }
+.research-task strong, .research-task small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.research-task small { margin-top: 4px; color: #7a8981; }
+.research-main { min-width: 0; padding: 34px clamp(24px, 4vw, 64px) 60px; overflow-y: auto; }
+.research-welcome { display: grid; place-items: center; max-width: 700px; min-height: 65vh; margin: auto; text-align: center; }
+.research-welcome > span { display: grid; place-items: center; width: 88px; height: 88px; border-radius: 50%; color: #f6f1df; background: #234b3c; font-size: 36px; box-shadow: 0 0 0 14px #e5ede5; }
+.research-welcome p { max-width: 620px; color: #64746b; font-size: 16px; line-height: 1.9; }
+.research-header { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+.research-header h2.ant-typography { margin: 4px 0 8px; color: #234b3c; font-family: Georgia, "Songti SC", serif; }
+.research-header p { max-width: 820px; color: #64746b; line-height: 1.8; }
+.research-progress-card, .verifier-card { margin-bottom: 28px; border-color: #dce6df; box-shadow: none; }
+.research-main > h3.ant-typography { margin-top: 34px; color: #2b5141; }
+.research-main .ant-steps { max-width: 920px; padding: 22px 24px 0; border: 1px solid #e1e9e3; border-radius: 18px; background: white; }
+.research-main .ant-collapse { border-color: #dce6df; background: white; }
+.research-report-section { margin-top: 38px; }
+.research-report { overflow-x: auto; padding: clamp(22px, 4vw, 44px); border: 1px solid #dce6df; border-radius: 20px; color: #35483f; background: white; font: 15px/1.9 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; box-shadow: 0 14px 36px rgb(35 75 60 / 7%); }
+
+@media (max-width: 900px) {
+  .research-page { grid-template-columns: 1fr; overflow: visible; }
+  .research-rail { min-height: auto; border-right: 0; border-bottom: 1px solid #dce6df; }
+  .research-task-list { max-height: 240px; }
+  .research-header { flex-direction: column; }
+}
+
 .image-base-select { width: min(320px, 100%); }
 .image-control-panel { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); gap: 18px; }
 .image-control-panel .ant-upload-wrapper, .image-control-panel .ant-upload-drag { min-height: 190px; }

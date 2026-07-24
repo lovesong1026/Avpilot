@@ -111,9 +111,7 @@ async def complete_agent_trace(
                 duration_ms=_duration_ms(item["started_at"], item["finished_at"]),
                 input_summary={"arguments": item.get("arguments") or {}},
                 output_summary={"hit_count": int(item.get("hit_count") or 0)},
-                error_message=(
-                    str(item["error"])[:2000] if item.get("error") else None
-                ),
+                error_message=(str(item["error"])[:2000] if item.get("error") else None),
             )
         )
 
@@ -130,9 +128,7 @@ async def complete_agent_trace(
             else []
         )
         scores = [
-            float(item["score"])
-            for item in citation_payloads
-            if item.get("score") is not None
+            float(item["score"]) for item in citation_payloads if item.get("score") is not None
         ]
         arguments = record.get("arguments")
         if not isinstance(arguments, dict):
@@ -218,12 +214,8 @@ def _model_usage(
     *,
     message_id: uuid.UUID | None = None,
 ) -> ModelUsage:
-    input_tokens = int(
-        usage.get("input_tokens") or usage.get("prompt_tokens") or 0
-    )
-    output_tokens = int(
-        usage.get("output_tokens") or usage.get("completion_tokens") or 0
-    )
+    input_tokens = int(usage.get("input_tokens") or usage.get("prompt_tokens") or 0)
+    output_tokens = int(usage.get("output_tokens") or usage.get("completion_tokens") or 0)
     return ModelUsage(
         user_id=trace.user_id,
         trace_id=trace.id,
@@ -234,17 +226,9 @@ def _model_usage(
         status=str(usage.get("status") or "completed")[:24],
         input_tokens=input_tokens,
         output_tokens=output_tokens,
-        total_tokens=int(
-            usage.get("total_tokens") or input_tokens + output_tokens
-        ),
-        duration_ms=(
-            int(usage["duration_ms"])
-            if usage.get("duration_ms") is not None
-            else None
-        ),
-        error_message=(
-            str(usage["error"])[:2000] if usage.get("error") else None
-        ),
+        total_tokens=int(usage.get("total_tokens") or input_tokens + output_tokens),
+        duration_ms=(int(usage["duration_ms"]) if usage.get("duration_ms") is not None else None),
+        error_message=(str(usage["error"])[:2000] if usage.get("error") else None),
     )
 
 
@@ -322,8 +306,7 @@ async def observability_summary(
             for offset in range(days)
         ],
         "tool_distribution": [
-            {"name": name, "value": int(count)}
-            for name, count in tool_rows.all()
+            {"name": name, "value": int(count)} for name, count in tool_rows.all()
         ],
     }
 
@@ -345,9 +328,7 @@ async def get_agent_trace_detail(
     session: AsyncSession, user_id: uuid.UUID, trace_id: uuid.UUID
 ) -> tuple[AgentTrace, list[AgentSpan], list[ModelUsage], list[RetrievalSnapshot]] | None:
     trace = await session.scalar(
-        select(AgentTrace).where(
-            AgentTrace.id == trace_id, AgentTrace.user_id == user_id
-        )
+        select(AgentTrace).where(AgentTrace.id == trace_id, AgentTrace.user_id == user_id)
     )
     if trace is None:
         return None

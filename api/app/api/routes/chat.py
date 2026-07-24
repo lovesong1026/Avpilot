@@ -70,9 +70,7 @@ async def update_conversation(
     session: SessionDependency,
 ) -> ConversationResponse:
     try:
-        conversation = await ConversationService(session).update(
-            user.id, conversation_id, request
-        )
+        conversation = await ConversationService(session).update(user.id, conversation_id, request)
         return await _conversation_response(ConversationRepository(session), conversation)
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=404, detail="对话不存在") from exc

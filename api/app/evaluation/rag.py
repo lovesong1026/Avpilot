@@ -27,9 +27,7 @@ def evaluate_retrieval_case(
         *(f"title:{value.casefold()}" for value in case.expected_document_titles),
     }
     retrieved = [_hit_keys(hit) for hit in hits[:top_k]]
-    matched = {
-        value for keys in retrieved for value in keys if value in expected
-    }
+    matched = {value for keys in retrieved for value in keys if value in expected}
     first_rank = next(
         (
             index
@@ -60,15 +58,9 @@ def aggregate_retrieval_metrics(
     count = len(rows)
     return {
         "cases": count,
-        "recall_at_k": round(
-            sum(float(row["recall_at_k"]) for row in rows) / count, 4
-        ),
-        "mrr": round(
-            sum(float(row["reciprocal_rank"]) for row in rows) / count, 4
-        ),
-        "citation_hit_rate": round(
-            sum(int(row["citation_hit"]) for row in rows) / count, 4
-        ),
+        "recall_at_k": round(sum(float(row["recall_at_k"]) for row in rows) / count, 4),
+        "mrr": round(sum(float(row["reciprocal_rank"]) for row in rows) / count, 4),
+        "citation_hit_rate": round(sum(int(row["citation_hit"]) for row in rows) / count, 4),
     }
 
 

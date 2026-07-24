@@ -67,7 +67,7 @@ async def suggest_tag_names(
         f"已有标签：{existing}\n"
         "必须优先复用语义合适的已有标签；只有全部不合适时才能创建一个新标签。"
         "不要创建同义词或过细标签。每个标签 2 到 6 个字。"
-        "只返回 JSON 数组，例如 [\"技术\",\"学习\"]。\n\n"
+        '只返回 JSON 数组，例如 ["技术","学习"]。\n\n'
         f"内容：\n{content[:1800]}"
     )
     response = await gateway.chat([{"role": "user", "content": prompt}], temperature=0.1)
@@ -86,9 +86,7 @@ def parse_tag_names(answer: str, existing_names: list[str] | None = None) -> lis
         return []
     if not isinstance(value, list):
         return []
-    existing_by_normalized = {
-        normalize_tag_name(name): name for name in existing_names or []
-    }
+    existing_by_normalized = {normalize_tag_name(name): name for name in existing_names or []}
     result: list[str] = []
     seen: set[str] = set()
     for item in value:

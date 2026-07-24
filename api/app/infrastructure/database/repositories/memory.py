@@ -18,9 +18,7 @@ class MemoryRepository:
     async def get(self, source_id: uuid.UUID) -> MemorySource | None:
         return await self.session.get(MemorySource, source_id)
 
-    async def get_for_user(
-        self, user_id: uuid.UUID, source_id: uuid.UUID
-    ) -> MemorySource | None:
+    async def get_for_user(self, user_id: uuid.UUID, source_id: uuid.UUID) -> MemorySource | None:
         statement = select(MemorySource).where(
             MemorySource.id == source_id,
             MemorySource.user_id == user_id,
@@ -35,4 +33,3 @@ class MemoryRepository:
             .limit(limit)
         )
         return list(await self.session.scalars(statement))
-

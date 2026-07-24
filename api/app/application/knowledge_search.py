@@ -143,9 +143,7 @@ async def _rerank(
     ]
 
 
-async def _resolve_results(
-    candidates: list[dict[str, Any]], top_k: int
-) -> list[dict[str, Any]]:
+async def _resolve_results(candidates: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
     seen_parents: set[str] = set()
     for candidate in candidates:

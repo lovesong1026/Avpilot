@@ -161,9 +161,7 @@ class FavoriteService:
                 target_id=target_id,
                 snapshot=snapshot,
             )
-            .on_conflict_do_update(
-                constraint="uq_favorite_target", set_={"snapshot": snapshot}
-            )
+            .on_conflict_do_update(constraint="uq_favorite_target", set_={"snapshot": snapshot})
         )
         await self.session.commit()
         result = await self.session.scalar(
@@ -179,9 +177,7 @@ class FavoriteService:
 
     async def list(self, user_id: uuid.UUID) -> list[Favorite]:
         statement = (
-            select(Favorite)
-            .where(Favorite.user_id == user_id)
-            .order_by(Favorite.created_at.desc())
+            select(Favorite).where(Favorite.user_id == user_id).order_by(Favorite.created_at.desc())
         )
         return list(await self.session.scalars(statement))
 
@@ -328,9 +324,9 @@ async def get_daily_review(
     )
     if existing is not None and not refresh:
         return existing
-    start = datetime.combine(
-        review_date, time.min, tzinfo=ZoneInfo("Asia/Shanghai")
-    ).astimezone(UTC)
+    start = datetime.combine(review_date, time.min, tzinfo=ZoneInfo("Asia/Shanghai")).astimezone(
+        UTC
+    )
     end = start + timedelta(days=1)
     messages = list(
         await session.scalars(
@@ -457,13 +453,12 @@ async def dashboard_data(session: AsyncSession, user_id: uuid.UUID) -> dict[str,
     counts["communities"] = len(communities)
     return {
         "counts": counts,
-        "tag_distribution": sorted(
-            tag_distribution, key=lambda item: item["value"], reverse=True
-        )[:10],
+        "tag_distribution": sorted(tag_distribution, key=lambda item: item["value"], reverse=True)[
+            :10
+        ],
         "memory_trend": memory_trend,
         "community_distribution": [
-            {"name": item["name"], "value": item["member_count"]}
-            for item in communities[:10]
+            {"name": item["name"], "value": item["member_count"]} for item in communities[:10]
         ],
         "observability": await observability_summary(session, user_id, 14),
     }

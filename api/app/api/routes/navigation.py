@@ -34,23 +34,17 @@ router = APIRouter(tags=["navigation"])
 
 @router.post("/search", response_model=GlobalSearchResponse)
 async def search_all(request: GlobalSearchRequest, user: CurrentUser) -> GlobalSearchResponse:
-    result = await global_search(
-        user.id, request.query.strip(), request.top_k, request.min_score
-    )
+    result = await global_search(user.id, request.query.strip(), request.top_k, request.min_score)
     return GlobalSearchResponse(query=request.query.strip(), **result)
 
 
 @router.get("/favorites", response_model=list[FavoriteResponse])
-async def list_favorites(
-    user: CurrentUser, session: SessionDependency
-) -> list[FavoriteResponse]:
+async def list_favorites(user: CurrentUser, session: SessionDependency) -> list[FavoriteResponse]:
     rows = await FavoriteService(session).list(user.id)
     return [FavoriteResponse.model_validate(item) for item in rows]
 
 
-@router.post(
-    "/favorites", response_model=FavoriteResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/favorites", response_model=FavoriteResponse, status_code=status.HTTP_201_CREATED)
 async def add_favorite(
     request: FavoriteCreate, user: CurrentUser, session: SessionDependency
 ) -> FavoriteResponse:
@@ -97,23 +91,17 @@ async def edit_tag(
     session: SessionDependency,
 ) -> TagManagementResponse:
     try:
-        tag = await update_tag(
-            session, user.id, tag_id, name=request.name, color=request.color
-        )
+        tag = await update_tag(session, user.id, tag_id, name=request.name, color=request.color)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if tag is None:
         raise HTTPException(status_code=404, detail="标签不存在")
-    usage = next(
-        item for item in await list_tags(session, user.id) if item["id"] == tag.id
-    )
+    usage = next(item for item in await list_tags(session, user.id) if item["id"] == tag.id)
     return TagManagementResponse.model_validate(usage)
 
 
 @router.delete("/tags/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_tag(
-    tag_id: uuid.UUID, user: CurrentUser, session: SessionDependency
-) -> None:
+async def remove_tag(tag_id: uuid.UUID, user: CurrentUser, session: SessionDependency) -> None:
     if not await delete_tag(session, user.id, tag_id):
         raise HTTPException(status_code=404, detail="标签不存在")
 

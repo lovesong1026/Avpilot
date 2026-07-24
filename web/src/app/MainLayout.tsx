@@ -8,6 +8,7 @@ import {
   NodeIndexOutlined,
   PictureOutlined,
   SearchOutlined,
+  ExperimentOutlined,
 } from "@ant-design/icons";
 import { Avatar, Button, Layout, Menu, Space, Typography } from "antd";
 import { useState } from "react";
@@ -22,6 +23,7 @@ const menuItems = [
   { key: "/knowledge", icon: <BookOutlined />, label: "知识库" },
   { key: "/images", icon: <PictureOutlined />, label: "图片库" },
   { key: "/chat", icon: <CommentOutlined />, label: "智能问答" },
+  { key: "/research", icon: <ExperimentOutlined />, label: "深度研究" },
   { key: "/memory", icon: <NodeIndexOutlined />, label: "记忆图谱" },
   { key: "/search", icon: <SearchOutlined />, label: "全局搜索" },
 ];

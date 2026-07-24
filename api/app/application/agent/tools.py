@@ -81,9 +81,7 @@ def build_agent_tools(context: AgentToolContext) -> list[AgentTool]:
             )
             for hit in hits
         ]
-        content = "\n".join(
-            f"{index}. {hit['excerpt']}" for index, hit in enumerate(hits, 1)
-        )
+        content = "\n".join(f"{index}. {hit['excerpt']}" for index, hit in enumerate(hits, 1))
         return ToolResult(
             tool_name="memory_search",
             content=content or "没有找到相关长期记忆。",

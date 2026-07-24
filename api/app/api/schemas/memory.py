@@ -63,4 +63,3 @@ class CommunityItem(BaseModel):
     name: str
     member_count: int
     members: list[dict[str, str]]
-

@@ -16,6 +16,7 @@ celery_app = Celery(
     include=[
         "app.tasks.ingestion",
         "app.tasks.memory",
+        "app.tasks.research",
         "app.tasks.maintenance",
     ],
 )
@@ -23,6 +24,7 @@ celery_app.conf.update(
     task_queues=(
         Queue("ingestion", task_exchange, routing_key="ingestion"),
         Queue("memory", task_exchange, routing_key="memory"),
+        Queue("research", task_exchange, routing_key="research"),
         Queue("maintenance", task_exchange, routing_key="maintenance"),
     ),
     task_default_queue="maintenance",
@@ -32,6 +34,7 @@ celery_app.conf.update(
     task_routes={
         "app.tasks.ingestion.*": {"queue": "ingestion"},
         "app.tasks.memory.*": {"queue": "memory"},
+        "app.tasks.research.*": {"queue": "research"},
         "app.tasks.maintenance.*": {"queue": "maintenance"},
     },
     task_track_started=True,

@@ -21,6 +21,7 @@ DOCUMENT_TASK = "app.tasks.ingestion.ingest_document"
 WEB_DOCUMENT_TASK = "app.tasks.ingestion.ingest_web_document"
 IMAGE_TASK = "app.tasks.ingestion.ingest_image"
 MEMORY_TASK = "app.tasks.memory.extract_memory"
+RESEARCH_TASK = "app.tasks.research.run_research"
 
 
 def task_dedupe_key(kind: str, target_id: uuid.UUID) -> str:
@@ -52,9 +53,7 @@ def enqueue_task(
 async def dispatch_outbox(dedupe_key: str) -> bool:
     """Best-effort immediate delivery; the beat recovery loop handles failures."""
     async with get_session_factory()() as session:
-        event = await session.scalar(
-            select(TaskOutbox).where(TaskOutbox.dedupe_key == dedupe_key)
-        )
+        event = await session.scalar(select(TaskOutbox).where(TaskOutbox.dedupe_key == dedupe_key))
         if event is None or event.status == "completed":
             return False
         return await _dispatch_event(session, event)
@@ -71,9 +70,7 @@ async def dispatch_due_outbox(limit: int = 100) -> int:
                 .where(
                     TaskOutbox.available_at <= now,
                     or_(
-                        TaskOutbox.status.in_(
-                            ("pending", "dispatch_failed", "retrying")
-                        ),
+                        TaskOutbox.status.in_(("pending", "dispatch_failed", "retrying")),
                         (
                             (TaskOutbox.status == "dispatching")
                             & (TaskOutbox.updated_at < abandoned)
@@ -134,9 +131,7 @@ async def claim_outbox(outbox_id: str, *, allow_running: bool = False) -> bool:
     """Atomically prevent concurrent duplicate deliveries from doing work twice."""
     async with get_session_factory()() as session:
         event = await session.scalar(
-            select(TaskOutbox)
-            .where(TaskOutbox.id == uuid.UUID(outbox_id))
-            .with_for_update()
+            select(TaskOutbox).where(TaskOutbox.id == uuid.UUID(outbox_id)).with_for_update()
         )
         if event is None or event.status == "completed":
             return False
@@ -235,9 +230,12 @@ async def prepare_ingestion_retry(
     if event is None:
         task_name = (
             WEB_DOCUMENT_TASK
-            if target_type == "document" and isinstance(target, Document)
+            if target_type == "document"
+            and isinstance(target, Document)
             and target.source_type == "web"
-            else DOCUMENT_TASK if target_type == "document" else IMAGE_TASK
+            else DOCUMENT_TASK
+            if target_type == "document"
+            else IMAGE_TASK
         )
         enqueue_task(
             session,
@@ -300,9 +298,7 @@ async def _mark_dispatch_stage(
         job.stage = stage
 
 
-async def _mark_retrying_target(
-    session: AsyncSession, payload: dict[str, object]
-) -> None:
+async def _mark_retrying_target(session: AsyncSession, payload: dict[str, object]) -> None:
     job_id = payload.get("job_id")
     if isinstance(job_id, str):
         job = await session.get(IngestionJob, uuid.UUID(job_id))
@@ -322,6 +318,15 @@ async def _mark_retrying_target(
         source = await session.get(MemorySource, uuid.UUID(source_id))
         if source is not None:
             source.status = "retrying"
+        return
+    research_id = payload.get("research_id")
+    if isinstance(research_id, str):
+        from app.infrastructure.database.models.research import ResearchTask
+
+        task = await session.get(ResearchTask, uuid.UUID(research_id))
+        if task is not None:
+            task.status = "retrying"
+            task.stage = "retry_wait"
 
 
 async def recover_stale_work() -> int:
@@ -366,9 +371,7 @@ async def recover_stale_work() -> int:
             if target is not None:
                 target.status = "pending"
             key = task_dedupe_key(job.target_type, job.id)
-            event = await session.scalar(
-                select(TaskOutbox).where(TaskOutbox.dedupe_key == key)
-            )
+            event = await session.scalar(select(TaskOutbox).where(TaskOutbox.dedupe_key == key))
             if event is not None:
                 _reset_event(event)
                 keys.append(key)
@@ -386,9 +389,28 @@ async def recover_stale_work() -> int:
             source.error_code = "TaskRecovered"
             source.error_message = "检测到 Worker 中断，任务已重新排队"
             key = task_dedupe_key("memory", source.id)
-            event = await session.scalar(
-                select(TaskOutbox).where(TaskOutbox.dedupe_key == key)
+            event = await session.scalar(select(TaskOutbox).where(TaskOutbox.dedupe_key == key))
+            if event is not None:
+                _reset_event(event)
+                keys.append(key)
+
+        from app.infrastructure.database.models.research import ResearchTask
+
+        research_tasks = list(
+            await session.scalars(
+                select(ResearchTask).where(
+                    ResearchTask.status.in_(("planning", "researching", "verifying", "writing")),
+                    ResearchTask.updated_at < cutoff,
+                )
             )
+        )
+        for task in research_tasks:
+            task.status = "pending"
+            task.stage = "recovered"
+            task.error_code = "TaskRecovered"
+            task.error_message = "检测到 Worker 中断，研究任务已重新排队"
+            key = task_dedupe_key("research", task.id)
+            event = await session.scalar(select(TaskOutbox).where(TaskOutbox.dedupe_key == key))
             if event is not None:
                 _reset_event(event)
                 keys.append(key)
@@ -403,11 +425,7 @@ async def rebuild_all_memory_communities() -> int:
     from app.infrastructure.graph.memory_graph import MemoryGraphRepository
 
     async with get_session_factory()() as session:
-        user_ids = list(
-            await session.scalars(
-                select(MemorySource.user_id).distinct()
-            )
-        )
+        user_ids = list(await session.scalars(select(MemorySource.user_id).distinct()))
     graph = MemoryGraphRepository()
     for user_id in user_ids:
         await graph.rebuild_communities(str(user_id))

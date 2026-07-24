@@ -98,7 +98,7 @@ class AgentOrchestrator:
             prompt = (
                 f"{AGENT_SYSTEM_PROMPT}\n\n"
                 f"可用工具：{', '.join(self.registry.names)}。\n"
-                '每轮只返回 JSON：调用工具时返回 '
+                "每轮只返回 JSON：调用工具时返回 "
                 '{"action":"tool","name":"工具名","arguments":{"query":"..."}}；'
                 '无需工具时返回 {"action":"final","answer":"简短回答或空字符串"}。\n'
                 f"图片背景：{image_context or '无'}\n"
@@ -167,9 +167,8 @@ class AgentOrchestrator:
             )
         return run
 
-async def _emit(
-    sink: AgentEventSink | None, event: str, payload: dict[str, Any]
-) -> None:
+
+async def _emit(sink: AgentEventSink | None, event: str, payload: dict[str, Any]) -> None:
     if sink is not None:
         await sink(event, payload)
 

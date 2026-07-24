@@ -18,7 +18,5 @@ def extract_memory(self, source_id: str, outbox_id: str) -> None:
     execute_reliable(
         self,
         outbox_id=outbox_id,
-        operation=lambda: process_memory_source(
-            uuid.UUID(source_id), raise_on_failure=True
-        ),
+        operation=lambda: process_memory_source(uuid.UUID(source_id), raise_on_failure=True),
     )

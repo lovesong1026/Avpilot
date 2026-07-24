@@ -56,9 +56,7 @@ class ConversationService:
         self.messages = MessageRepository(session)
         self.knowledge = KnowledgeRepository(session)
 
-    async def create(
-        self, user_id: uuid.UUID, request: ConversationCreate
-    ) -> Conversation:
+    async def create(self, user_id: uuid.UUID, request: ConversationCreate) -> Conversation:
         knowledge_base_ids = await self._validated_or_default_ids(
             user_id, request.knowledge_base_ids
         )
@@ -80,9 +78,7 @@ class ConversationService:
             knowledge_base_ids = await self._validated_or_default_ids(
                 user_id, request.knowledge_base_ids
             )
-            await self.conversations.replace_knowledge_bases(
-                conversation.id, knowledge_base_ids
-            )
+            await self.conversations.replace_knowledge_bases(conversation.id, knowledge_base_ids)
         await self.session.commit()
         await self.session.refresh(conversation)
         return conversation
@@ -92,9 +88,7 @@ class ConversationService:
         await self.session.delete(conversation)
         await self.session.commit()
 
-    async def _required(
-        self, user_id: uuid.UUID, conversation_id: uuid.UUID
-    ) -> Conversation:
+    async def _required(self, user_id: uuid.UUID, conversation_id: uuid.UUID) -> Conversation:
         conversation = await self.conversations.get(user_id, conversation_id)
         if conversation is None:
             raise ConversationNotFoundError
@@ -128,9 +122,7 @@ def build_grounded_messages(
     for index, hit in enumerate(hits, start=1):
         citation = hit["citation"]
         page = f"，第 {citation['page']} 页" if citation.get("page") else ""
-        sources.append(
-            f"[资料 {index}] {citation['document_title']}{page}\n{hit['content']}"
-        )
+        sources.append(f"[资料 {index}] {citation['document_title']}{page}\n{hit['content']}")
     source_text = "\n\n".join(sources)
     system = (
         "你是 Avpilot 星航仪，一个严谨的知识库问答助手。\n"
@@ -147,9 +139,7 @@ def build_grounded_messages(
     return messages
 
 
-async def stream_chat_turn(
-    user_id: uuid.UUID, request: ChatStreamRequest
-) -> AsyncIterator[str]:
+async def stream_chat_turn(user_id: uuid.UUID, request: ChatStreamRequest) -> AsyncIterator[str]:
     gateway: BailianGateway | None = None
     trace_id: uuid.UUID | None = None
     try:
@@ -174,9 +164,7 @@ async def stream_chat_turn(
                         conversation.id, selected_ids
                     )
                 else:
-                    selected_ids = await service.conversations.knowledge_base_ids(
-                        conversation.id
-                    )
+                    selected_ids = await service.conversations.knowledge_base_ids(conversation.id)
                     if not selected_ids:
                         selected_ids = await service._validated_or_default_ids(user_id, [])
                         await service.conversations.replace_knowledge_bases(
@@ -307,9 +295,7 @@ async def stream_chat_turn(
             answer_parts: list[str] = []
             usage: dict[str, object] | None = None
             answer_model = (
-                settings.bailian_vision_model
-                if image_urls
-                else settings.bailian_chat_model
+                settings.bailian_vision_model if image_urls else settings.bailian_chat_model
             )
             answer_started = datetime.now(UTC)
             async for chunk in gateway.stream_chat(
@@ -407,8 +393,7 @@ def build_agent_answer_messages(
         if citation.url:
             location = f"\n网址：{citation.url}"
         sources.append(
-            f"[来源 {index}][{citation.source_type}] {citation.title}{location}\n"
-            f"{citation.quote}"
+            f"[来源 {index}][{citation.source_type}] {citation.title}{location}\n{citation.quote}"
         )
     tool_context = "\n\n".join(
         f"[工具结果：{result.tool_name}]\n{result.content}" for result in results
@@ -431,8 +416,7 @@ def build_agent_answer_messages(
     if image_urls:
         content: list[dict[str, Any]] = [{"type": "text", "text": question}]
         content.extend(
-            {"type": "image_url", "image_url": {"url": image_url}}
-            for image_url in image_urls
+            {"type": "image_url", "image_url": {"url": image_url}} for image_url in image_urls
         )
         messages.append({"role": "user", "content": content})  # type: ignore[typeddict-item]
     else:

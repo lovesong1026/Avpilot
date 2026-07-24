@@ -166,9 +166,7 @@ async def get_image_content(
 
 
 @router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_image(
-    image_id: uuid.UUID, user: CurrentUser, session: SessionDependency
-) -> None:
+async def delete_image(image_id: uuid.UUID, user: CurrentUser, session: SessionDependency) -> None:
     try:
         await ImageService(session).delete(user.id, image_id)
     except ImageNotFoundError as exc:

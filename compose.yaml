@@ -85,7 +85,7 @@ services:
         "-l",
         "INFO",
         "-Q",
-        "ingestion,memory,maintenance",
+        "ingestion,memory,research,maintenance",
         "--concurrency=2",
       ]
     volumes:

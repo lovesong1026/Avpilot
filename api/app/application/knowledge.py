@@ -79,9 +79,7 @@ class KnowledgeService:
         await self.session.refresh(knowledge_base)
         return knowledge_base
 
-    async def delete_knowledge_base(
-        self, user_id: uuid.UUID, knowledge_base_id: uuid.UUID
-    ) -> None:
+    async def delete_knowledge_base(self, user_id: uuid.UUID, knowledge_base_id: uuid.UUID) -> None:
         knowledge_base = await self.repository.get_knowledge_base(user_id, knowledge_base_id)
         if knowledge_base is None:
             raise KnowledgeNotFoundError
@@ -121,9 +119,7 @@ class KnowledgeService:
         if len(content) > max_bytes:
             raise InvalidUploadError(f"文件不能超过 {get_settings().max_upload_size_mb} MB")
         content_hash = hashlib.sha256(content).hexdigest()
-        if await self.repository.find_document_by_hash(
-            user_id, knowledge_base_id, content_hash
-        ):
+        if await self.repository.find_document_by_hash(user_id, knowledge_base_id, content_hash):
             raise KnowledgeConflictError("这个文件已经在当前知识库中")
 
         document = Document(
@@ -187,9 +183,7 @@ class KnowledgeService:
         if await self.repository.get_knowledge_base(user_id, knowledge_base_id) is None:
             raise KnowledgeNotFoundError
         normalized_url = url.strip()
-        if await self.repository.find_document_by_url(
-            user_id, knowledge_base_id, normalized_url
-        ):
+        if await self.repository.find_document_by_url(user_id, knowledge_base_id, normalized_url):
             raise KnowledgeConflictError("这个网页已经在当前知识库中")
         document = Document(
             user_id=user_id,
@@ -254,9 +248,7 @@ async def process_document(
 
             content = await LocalDocumentStorage().read(document.file_key)
             parse_name = (
-                "web.txt"
-                if document.source_type == "web"
-                else document.file_name or document.title
+                "web.txt" if document.source_type == "web" else document.file_name or document.title
             )
             parsed = parse_document(parse_name, content)
             job.stage = "chunking"

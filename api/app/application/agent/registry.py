@@ -52,9 +52,7 @@ class AgentToolRegistry:
             )
         started = time.monotonic()
         try:
-            result = await asyncio.wait_for(
-                tool.handler(arguments), timeout=self.timeout_seconds
-            )
+            result = await asyncio.wait_for(tool.handler(arguments), timeout=self.timeout_seconds)
             record = {
                 "name": name,
                 "arguments": arguments,

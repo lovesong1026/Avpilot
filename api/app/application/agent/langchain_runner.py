@@ -86,9 +86,7 @@ class LangChainAgentRunner:
                             seen_usage_messages.add(message_key)
         run.direct_answer = last_answer
         if run.model_usages:
-            run.model_usages[-1]["duration_ms"] = round(
-                (time.monotonic() - started) * 1000
-            )
+            run.model_usages[-1]["duration_ms"] = round((time.monotonic() - started) * 1000)
         return run
 
     def _adapt_tool(
@@ -152,8 +150,6 @@ def _message_usage(message: AIMessage) -> dict[str, Any] | None:
         "status": "completed",
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
-        "total_tokens": int(
-            usage.get("total_tokens") or input_tokens + output_tokens
-        ),
+        "total_tokens": int(usage.get("total_tokens") or input_tokens + output_tokens),
         "duration_ms": None,
     }

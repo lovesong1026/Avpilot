@@ -13,6 +13,7 @@ const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage").th
 const ImageLibraryPage = lazy(() => import("./features/images/ImageLibraryPage").then((module) => ({ default: module.ImageLibraryPage })));
 const KnowledgePage = lazy(() => import("./features/knowledge/KnowledgePage").then((module) => ({ default: module.KnowledgePage })));
 const MemoryPage = lazy(() => import("./features/memory/MemoryPage").then((module) => ({ default: module.MemoryPage })));
+const ResearchPage = lazy(() => import("./features/research/ResearchPage").then((module) => ({ default: module.ResearchPage })));
 const SearchPage = lazy(() => import("./features/search/SearchPage").then((module) => ({ default: module.SearchPage })));
 
 function page(content: ReactNode) {
@@ -44,6 +45,7 @@ function App() {
           <Route path="knowledge" element={page(<KnowledgePage />)} />
           <Route path="images" element={page(<ImageLibraryPage />)} />
           <Route path="chat" element={page(<ChatPage />)} />
+          <Route path="research" element={page(<ResearchPage />)} />
           <Route path="memory" element={page(<MemoryPage />)} />
           <Route path="search" element={page(<SearchPage />)} />
         </Route>

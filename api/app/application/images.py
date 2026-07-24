@@ -77,9 +77,7 @@ class ImageService:
         except InvalidImageError as exc:
             raise InvalidImageUploadError(str(exc)) from exc
         content_hash = hashlib.sha256(content).hexdigest()
-        if await self.repository.find_image_by_hash(
-            user_id, knowledge_base_id, content_hash
-        ):
+        if await self.repository.find_image_by_hash(user_id, knowledge_base_id, content_hash):
             raise ImageConflictError("这张图片已经在当前知识库中")
 
         image = ImageAsset(

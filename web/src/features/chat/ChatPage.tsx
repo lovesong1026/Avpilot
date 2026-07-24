@@ -2,6 +2,7 @@ import {
   BookOutlined,
   CommentOutlined,
   DeleteOutlined,
+  ExperimentOutlined,
   GlobalOutlined,
   LoadingOutlined,
   PaperClipOutlined,
@@ -24,6 +25,7 @@ import {
   Typography,
 } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import type {
   ChatCitation,
@@ -52,6 +54,7 @@ const phaseCopy: Record<ChatPhase, string> = {
 
 export function ChatPage() {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [images, setImages] = useState<ImageAsset[]>([]);
@@ -253,6 +256,22 @@ export function ChatPage() {
     }
   };
 
+  const startResearch = () => {
+    const question =
+      input.trim() ||
+      [...messages].reverse().find((item) => item.role === "user")?.content.trim();
+    if (!question) {
+      message.warning("请先输入一个研究课题");
+      return;
+    }
+    const params = new URLSearchParams({
+      question,
+      knowledge_base_ids: selectedBaseIds.join(","),
+      allow_web: String(allowWeb),
+    });
+    navigate(`/research?${params.toString()}`);
+  };
+
   return (
     <div className="chat-page">
       <aside className="conversation-rail">
@@ -363,7 +382,10 @@ export function ChatPage() {
             autoSize={{ minRows: 2, maxRows: 6 }}
             disabled={sending}
           />
-          <Button type="primary" shape="circle" size="large" icon={<SendOutlined />} aria-label="发送问题" loading={sending} onClick={() => void sendMessage()} />
+          <Space direction="vertical">
+            <Button type="primary" shape="circle" size="large" icon={<SendOutlined />} aria-label="发送问题" loading={sending} onClick={() => void sendMessage()} />
+            <Button type="text" size="small" icon={<ExperimentOutlined />} disabled={sending} onClick={startResearch}>深度研究</Button>
+          </Space>
         </footer>
       </main>
 
